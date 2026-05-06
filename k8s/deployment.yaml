@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: glpi
-          image: phumthanarat/glpi-dev:1.000.1001
+          image: phumthanarat/glpi-dev:1.000.1002
 
           ports:
             - containerPort: 80
