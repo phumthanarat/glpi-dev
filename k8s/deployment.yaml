@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: glpi
-          image: phumthanarat/glpi-dev:latest   # 👈 สำคัญ
+          image: phumthanarat/glpi-dev:1.000.1000   # 👈 สำคัญ
           ports:
             - containerPort: 80
