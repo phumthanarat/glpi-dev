@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glpi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glpi
+  template:
+    metadata:
+      labels:
+        app: glpi
+    spec:
+      containers:
+        - name: glpi
+          image: phumthanarat/glpi-dev:1.000.1000
+          ports:
+            - containerPort: 80
