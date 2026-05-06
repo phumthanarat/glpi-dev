@@ -1,11 +1,12 @@
 {
-    "compilerOptions": {
-        "skipLibCheck": true,
-        "strict": true,
-        "target": "ES2022",
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "esModuleInterop": true
-    },
-    "include": ["tests/e2e/**/*.ts"],
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "baseUrl": "."
+  },
+  "include": ["tests/e2e/**/*.ts"]
 }

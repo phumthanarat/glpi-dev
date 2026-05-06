@@ -1,0 +1,9 @@
+node_modules
+vendor
+.git
+cypress
+tests
+.cache
+dist
+build
+*.log
