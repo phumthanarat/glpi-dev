@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: glpi-dev
+  namespace: glpi-dev
 spec:
   replicas: 1
   selector:
@@ -14,6 +15,63 @@ spec:
     spec:
       containers:
         - name: glpi
-          image: phumthanarat/glpi-dev:1.000.1000   # 👈 สำคัญ
+          image: phumthanarat/glpi-dev:1.000.1001
+
           ports:
             - containerPort: 80
+
+          # =========================
+          # ENV from Secret
+          # =========================
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: glpi-db-secret
+                  key: DB_HOST
+
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: glpi-db-secret
+                  key: DB_NAME
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: glpi-db-secret
+                  key: DB_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: glpi-db-secret
+                  key: DB_PASSWORD
+
+            - name: TZ
+              value: "Asia/Bangkok"
+
+          # =========================
+          # HEALTH CHECK (สำคัญ)
+          # =========================
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
