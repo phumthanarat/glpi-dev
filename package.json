@@ -22,7 +22,7 @@
         "@fullcalendar/timeline": "^4.4.3",
         "@glpi-project/illustrations": "^0.9.1",
         "@tabler/core": "^1.4.0",
-        "@tabler/icons-webfont": "^3.34.1",
+        "@tabler/icons-webfont": "^3.44.0",
         "ajv": "^8.20.0",
         "ajv-keywords": "^5.1.0",
         "altcha": "^2.3.0",
