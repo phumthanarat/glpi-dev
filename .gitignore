@@ -59,3 +59,8 @@ phpstan.neon
 /tests/e2e/output/
 /tests/e2e/.env.local
 !/tests/e2e/.env
+
+# install.sh
+/install.env
+/k8s/.install/
+/k8s/.install-test/

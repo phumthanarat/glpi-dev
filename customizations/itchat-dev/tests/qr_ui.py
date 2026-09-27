@@ -133,8 +133,11 @@ with sync_playwright() as pw:
     tampered = {}
     for label, url in {
         'bad_signature': re.sub(r's=[0-9a-f]+', 's=' + '0' * 24, QR['printer']['url']),
-        'other_id': re.sub(r'id=\d+', f"id={QR['computer']['id']}", QR['printer']['url']),
+        # the printer's signature on another id (+1: a fresh database gives the test printer and
+        # computer the same id, so "the computer's id" could be the printer's own)
+        'other_id': re.sub(r'id=\d+', f"id={QR['printer']['id'] + 1}", QR['printer']['url']),
     }.items():
+        assert url != QR['printer']['url'], f'{label}: tampered URL equals the real one'
         resp = page.goto(local(url))
         page.wait_for_load_state('networkidle')
         body = page.locator('body').inner_text()

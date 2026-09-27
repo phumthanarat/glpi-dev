@@ -17,11 +17,17 @@ require '/var/www/glpi/vendor/autoload.php';
 $kernel = new \Glpi\Kernel\Kernel();
 $kernel->boot();
 
+// Super-Admin session for this CLI run, without a password: these scripts only run inside the
+// app container (which has the database credentials anyway), and must keep working after the
+// admin password is changed (setup-21).
 $auth = new Auth();
-if (!$auth->login('glpi', 'glpi', false)) {
-    fwrite(STDERR, "Login as 'glpi' failed.\n");
+$auth->user = new User();
+if (PHP_SAPI !== 'cli' || !$auth->user->getFromDBbyName('glpi')) {
+    fwrite(STDERR, "Run from the command line in the GLPI container ('glpi' user needed).\n");
     exit(1);
 }
+$auth->auth_succeded = true;
+$auth->user_present  = true;
 Session::init($auth);
 
 $css_path = __DIR__ . '/dashboard-override.css';

@@ -49,7 +49,28 @@ helm install kong kong/kong \
 provision one (cloud LB, or MetalLB on bare metal) — swap to `NodePort`
 if there isn't one yet, the same way `overlays/local-dev` does it.
 
-## 3. Then apply this app
+## 3. Then install the app: `./install.sh`
+
+One command does the whole install (and later upgrades): Secrets, manifests with your image
+and domain, GLPI's tables on the empty database, the ITSM configuration (setup-00..21), both
+plugins, branding, and closing the default logins.
+
+```bash
+# the image must be in a registry every node can pull from
+docker build -t ghcr.io/<you>/glpi-itsm:11.0 . && docker push ghcr.io/<you>/glpi-itsm:11.0
+
+cp install.env.example install.env     # URL, database, SMTP, admin password, image
+./install.sh -c install.env            # shows the target cluster + settings, asks, installs
+```
+
+It is safe to run again: an existing GLPI database is updated, not reinstalled, and every
+configuration step is idempotent. `--skip-k8s` re-runs only the configuration.
+Then check the install end to end:
+`GLPI_URL=https://... ADMIN_PASS='...' NS=glpi customizations/itchat-dev/tests/run.sh smoke`
+
+The manual way (what install.sh automates) stays below for reference.
+
+## 3b. Manual: apply this app
 
 ```bash
 # real Secret first (see base/secret-db-external.example.yaml)
