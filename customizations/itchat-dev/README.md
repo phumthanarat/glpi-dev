@@ -34,13 +34,14 @@ Asset cache-busting no longer depends on the version: GLPI serves plugin assets 
 customizations/itchat-dev/tests/run.sh smoke     # flow x3 + security + features + collab   (~1 min)
 customizations/itchat-dev/tests/run.sh full      # flow x30 + security + features + collab + browser UI (~6 min)
 customizations/itchat-dev/tests/run.sh flow 100  # just the chat -> ticket flow, 100 rounds
-customizations/itchat-dev/tests/run.sh security | features | collab | tickets | helpdesk | ui
+customizations/itchat-dev/tests/run.sh security | features | collab | tickets | helpdesk | central | email | qr | ui
+customizations/itchat-dev/tests/run.sh load      # LOAD_PER_CHANNEL (400) tickets through each of the 5 channels, all at once
 ```
 
 `fixtures.php` runs inside a pod. It creates `itchat.test.user1` / `itchat.test.user2` (Self-Service),
 `itchat.test.tech` / `itchat.test.tech2` (Technician) with random passwords, and `[itchat-test] Group`, with user1 as a member and the tech as
-manager. `run.sh` **always** tears them down, together with every chat, ticket and file they produced, even when a
-test fails. Real users and chats are not touched, with one exception: `features` runs the hourly automatic action
+manager. `run.sh` tears them down, together with every chat, ticket and file they produced, even when a
+test fails (`KEEP_DATA=1` skips that; the next run's setup removes the leftovers). Real users and chats are not touched, with one exception: `features` runs the hourly automatic action
 once, exactly as the scheduled cron would.
 
 | Suite | Covers |
@@ -51,7 +52,15 @@ once, exactly as the scheduled cron would.
 | `test_collab.py` | transfer rules, ticket ↔ chat followup sync (public/private, no echo, files), rating rules, dashboard providers, search (text/login/#ticket, wildcard escaping, rights) |
 | `test_tickets.py` | plain GLPI ticket lifecycle as real users: category→team rules, priority→SLA + escalation levels, Request→manager approval (setup-08 + setup-17), take/followup/task/solution, approve→closed, refuse (reason required)→reopened, visibility, notifications |
 | `test_helpdesk.py` + `helpdesk_ui.py` | tickets filed through the real Helpdesk forms ("Report an issue", "Request a service") in a browser: urgency/category/title/description/attachment, then type, category, urgency, requester group, approval, team, SLA, attachment and visibility checked on the resulting tickets |
+| `test_central.py` + `central_ui.py` | a technician opens tickets for requesters from Central "+ Add" in a browser: type/category reloads, requester, assignee kept (setup-18), source Phone (setup-20) |
+| `test_email.py` | e-mails into the IT mailbox (greenmail), collected by the real glpi-cron: ticket, attachment, Helpdesk team (setup-19), unknown sender and auto-reply refused, reply to GLPI's e-mail -> followup |
+| `test_qr.py` + `qr_ui.py` | itqr plugin: asset tab + labels page, scan while logged out -> login -> report on a phone screen -> ticket with the device, category, source "QR code"; tampered labels refused |
+| `test_load.py` | load + coverage: helpdesk, central, chat, qr, e-mail at once (`LOAD_PER_CHANNEL`, `LOAD_WORKERS`), every ticket checked against the rules and its channel's source. Keeps the tickets unless `LOAD_PURGE=1` |
 | `test_ui.py` | Playwright/Chromium in docker. Covers the requester on a 390 px phone and the tech on desktop, browser notification + title count, sound toggle, canned replies, dialog, close/start-new. Screenshots go to `tests/shots/` |
+
+Kept test data (`KEEP_DATA=1`) can be turned into demo data out of the suite's reach with
+`keep-test-data-as-demo.php` (users `demo.*`, `[demo]` titles; next batch `demo2.*`), and removed again with
+`delete-demo-data.php` (`tickets <shard> <shards>` in parallel on the pods, then `rest`).
 
 Needs `kubectl`, `python3` + `requests`, and `docker` (lint and the browser test run in containers).
 Env overrides: `GLPI_URL` (default `http://localhost:30080`), `NS`, `APP_LABEL`, `CONTAINER`, `ADMIN_USER`/`ADMIN_PASS`.
