@@ -271,6 +271,8 @@ switch ($argv[1] ?? '') {
                 'approvers'         => $approvers,
                 'documents'         => countElementsInTable('glpi_documents_items', ['itemtype' => 'Ticket', 'items_id' => $tid]),
                 'sla_ttr'           => (int) $t->fields['slas_id_ttr'],
+                'tasks'             => array_values(array_map(static fn($r) => Glpi\RichText\RichText::getTextFromHtml((string) $r['content'], false, false, false, true),
+                    iterator_to_array($DB->request(['FROM' => 'glpi_tickettasks', 'WHERE' => ['tickets_id' => $tid], 'ORDER' => 'id'])))),
                 'followups'         => array_values(array_map(
                     static fn($f) => Glpi\RichText\RichText::getTextFromHtml((string) $f['content'], false, false, false, true),
                     iterator_to_array($DB->request(['FROM' => 'glpi_itilfollowups', 'WHERE' => ['itemtype' => 'Ticket', 'items_id' => $tid], 'ORDER' => 'id']))
