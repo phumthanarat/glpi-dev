@@ -128,6 +128,16 @@ if [ $SKIP_K8S != 1 ]; then
         --from-literal=host="$DB_HOST" --from-literal=port="$DB_PORT" --from-literal=database="$DB_NAME" \
         --from-literal=user="$DB_USER" --from-literal=password="$DB_PASSWORD" \
         --dry-run=client -o yaml | kubectl apply -f -
+    if [ "${LOCAL_DB:-0}" = 1 ]; then
+        # the overlay runs its own MariaDB (local-dev): its Secret, with the DB_* credentials.
+        # The root password is generated once and kept on later runs.
+        root_pw=$(kx get secret mariadb-local -o jsonpath='{.data.MARIADB_ROOT_PASSWORD}' 2>/dev/null | base64 -d || true)
+        [ -n "$root_pw" ] || root_pw=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+        kx create secret generic mariadb-local \
+            --from-literal=MARIADB_DATABASE="$DB_NAME" --from-literal=MARIADB_USER="$DB_USER" \
+            --from-literal=MARIADB_PASSWORD="$DB_PASSWORD" --from-literal=MARIADB_ROOT_PASSWORD="$root_pw" \
+            --dry-run=client -o yaml | kubectl apply -f -
+    fi
     if [ -n "${MAIL_INTAKE_HOST:-}" ]; then
         kx create secret generic mail-intake \
             --from-literal=MAIL_INTAKE_HOST="$MAIL_INTAKE_HOST" --from-literal=MAIL_INTAKE_ADDRESS="${MAIL_INTAKE_ADDRESS:-}" \
@@ -158,6 +168,10 @@ patches:
         value: $INGRESS_HOST
 EOF
     kubectl apply -k "$GEN"
+    if [ "${LOCAL_DB:-0}" = 1 ]; then
+        echo "waiting for the in-cluster MariaDB..."
+        kx rollout status deploy/mariadb --timeout=600s
+    fi
 
     # ------------------------------------------------------------ 3. database
     step "3. database (create tables, or update an existing GLPI schema)"
