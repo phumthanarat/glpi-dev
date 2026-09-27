@@ -10,8 +10,16 @@ resources:
   - daily-summary-cronjob.yaml
   - backup-cronjob.yaml
   - https-rbac.yaml
+  - monitor-deployment.yaml
 
 # secret-db-external.example.yaml is NOT listed here on purpose — it's a
 # template, not something to apply. Create the real "db-external" Secret
 # per-cluster (see its own comments), or add your own secret manifest in
 # the overlay that uses this base.
+
+# the monitor's script; the name gets a content hash, so a changed script rolls the Deployment
+configMapGenerator:
+  - name: glpi-monitor-script
+    namespace: glpi
+    files:
+      - monitor/monitor.py

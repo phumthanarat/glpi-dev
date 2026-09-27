@@ -172,6 +172,12 @@ modern. See each one's own README:
 [watermark](./watermark/README.md),
 [rebrand-it-dev](./rebrand-it-dev/README.md).
 
+## `itmonitor/` + glpi-monitor — alerts when something breaks, Setup > Monitoring
+
+A monitor pod checks GLPI, database, cron, mail collectors, disk, HTTPS expiry and backups every
+minute and alerts by e-mail / Teams / Google Chat / Slack / LINE / webhook (problem, reminder,
+recovered, optional daily "all OK"). Details: [`itmonitor/README.md`](./itmonitor/README.md).
+
 ## `itsecurity/` — 2FA + idle timeout, Setup > Security
 
 Idle timeout of web sessions (background polling doesn't count as activity), 2FA enforced per

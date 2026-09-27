@@ -1,0 +1,99 @@
+# glpi-monitor: checks GLPI every minute from outside the app pods and sends alerts
+# (e-mail / Teams / Google Chat / Slack / LINE / webhook). Script: monitor/monitor.py.
+# Settings: Secret glpi-monitor (install.sh creates it; Setup > Monitoring in GLPI edits it),
+# mounted as files and re-read every round. Status: http://glpi-monitor:8080/status.
+# Note: it runs in the same cluster as GLPI - if the whole cluster / node is down it can't
+# alert: use the daily "all OK" message (HEARTBEAT_HOUR) or an outside uptime check too.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glpi-monitor
+  namespace: glpi
+  labels:
+    app: glpi-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glpi-monitor
+  template:
+    metadata:
+      labels:
+        app: glpi-monitor
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 33          # same uid as GLPI: reads the backups volume
+        runAsGroup: 33
+      containers:
+        - name: monitor
+          image: python:3.12-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-u", "/app/monitor.py"]
+          ports:
+            - containerPort: 8080
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - { name: script, mountPath: /app, readOnly: true }
+            - { name: config, mountPath: /etc/glpi-monitor, readOnly: true }
+            - { name: glpi-backups, mountPath: /var/lib/glpi-backups, readOnly: true }
+      volumes:
+        - name: script
+          configMap:
+            name: glpi-monitor-script
+        - name: config
+          secret:
+            secretName: glpi-monitor
+            optional: true
+        - name: glpi-backups
+          persistentVolumeClaim:
+            claimName: glpi-backups
+            readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glpi-monitor
+  namespace: glpi
+spec:
+  selector:
+    app: glpi-monitor
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+# Setup > Monitoring (GLPI, ServiceAccount glpi-app) may read / change this one Secret
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: glpi-monitor-config
+  namespace: glpi
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["glpi-monitor"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: glpi-monitor-config
+  namespace: glpi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: glpi-monitor-config
+subjects:
+  - kind: ServiceAccount
+    name: glpi-app
+    namespace: glpi
