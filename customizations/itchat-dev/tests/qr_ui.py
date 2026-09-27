@@ -14,6 +14,8 @@ import re
 
 from playwright.sync_api import sync_playwright
 
+from totp import browser_mfa
+
 BASE = os.environ['GLPI_URL'].rstrip('/')
 CREDS = json.loads(os.environ['ITCHAT_TEST_CREDS'])
 QR = json.loads(os.environ['QR'])
@@ -33,6 +35,7 @@ def login(page, user):
     page.fill('input[name="login_password"]', CREDS[user])
     page.press('input[name="login_password"]', 'Enter')
     page.wait_for_load_state('networkidle')
+    browser_mfa(page, user)
 
 
 def shot(page, name):

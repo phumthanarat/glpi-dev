@@ -13,6 +13,7 @@
  *   php fixtures.php mail-status <subject-marker>  tickets / refused mails / mailgate state for it
  *   php fixtures.php qr-assets      creates a test printer + computer, prints their QR report URLs
  *   php fixtures.php purge-tickets  ids on stdin: purge those tickets (test users' only), for the load test
+ *   php fixtures.php totp-set <login>  (re-)enrol a 2FA test account, prints its TOTP secret
  *   php fixtures.php forms          active Helpdesk forms: {form name: {id, questions: {name: id}}}
  *   php fixtures.php mail-send-batch   like mail-send, a JSON list of e-mails on stdin (one SMTP connection)
  *   php fixtures.php mailgate-param <n>|restore   e-mails fetched per mailgate run (load test), restore = 100 (setup-19)
@@ -54,7 +55,12 @@ const USERS = [
     'itchat.test.user2' => 'Self-Service',
     'itchat.test.tech'  => 'Technician',
     'itchat.test.tech2' => 'Technician',
+    // Super-Admin for the suites that need one, instead of the real 'glpi' account (whose
+    // password and 2FA belong to the people running GLPI)
+    'itchat.test.admin' => 'Super-Admin',
 ];
+// accounts that get a TOTP secret (2FA is enforced for central profiles: setup-24)
+const TOTP_USERS = ['itchat.test.tech', 'itchat.test.tech2', 'itchat.test.admin'];
 const GROUP = '[itchat-test] Group';
 const MAIL_DOMAIN = 'dev.glpi.labs';
 
@@ -199,6 +205,17 @@ switch ($argv[1] ?? '') {
         // like an LDAP-synced user: the group is also user1's default group (setup-17 rule uses it)
         (new User())->update(['id' => userId('itchat.test.user1'), 'groups_id' => $gid]);
         (new Group_User())->add(['groups_id' => $gid, 'users_id' => userId('itchat.test.tech'), 'is_manager' => 1]);
+        // 2FA: a known TOTP secret per central account, so the suites can answer the MFA prompt
+        $totp = new \Glpi\Security\TOTPManager();
+        $creds['_totp'] = [];
+        foreach (TOTP_USERS as $login) {
+            $secret = $totp->createSecret();
+            $totp->setSecretForUser(userId($login), $secret);
+            // like a user who already went through enrolment: backup codes exist, so GLPI
+            // doesn't stop the next login on its one-time "your backup codes" page
+            $totp->regenerateBackupCodes(userId($login));
+            $creds['_totp'][$login] = $secret;
+        }
         echo json_encode(['users' => $creds, 'group' => GROUP]), "\n";
         break;
 
@@ -373,6 +390,19 @@ switch ($argv[1] ?? '') {
             }
         }
         echo json_encode(['purged' => $n]), "\n";
+        break;
+
+    case 'totp-set':
+        // php fixtures.php totp-set <login> : (re-)enrol a test account in 2FA, prints the secret
+        if (!in_array($argv[2] ?? '', TOTP_USERS, true)) {
+            fwrite(STDERR, "not a 2FA test account\n");
+            exit(1);
+        }
+        $totp = new \Glpi\Security\TOTPManager();
+        $secret = $totp->createSecret();
+        $totp->setSecretForUser(userId($argv[2]), $secret);
+        $totp->regenerateBackupCodes(userId($argv[2]));
+        echo json_encode(['secret' => $secret]), "\n";
         break;
 
     case 'user-ids':

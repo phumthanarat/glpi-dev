@@ -11,6 +11,8 @@ import re
 
 from playwright.sync_api import sync_playwright
 
+from totp import browser_mfa
+
 BASE = os.environ['GLPI_URL'].rstrip('/')
 CREDS = json.loads(os.environ['ITCHAT_TEST_CREDS'])
 SHOTS = os.environ.get('SHOTS', 'shots')
@@ -139,6 +141,7 @@ with sync_playwright() as pw:
     page.fill('input[name="login_password"]', CREDS['itchat.test.tech'])
     page.press('input[name="login_password"]', 'Enter')
     page.wait_for_load_state('networkidle')
+    browser_mfa(page, 'itchat.test.tech')
     fab = page.locator('.itchat-fab')
 
     out['request'] = new_ticket(page, requester='itchat.test.user1', type_=2, category_search='AD Account',

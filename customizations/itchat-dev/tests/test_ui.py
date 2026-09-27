@@ -11,6 +11,7 @@ import re
 from playwright.sync_api import expect, sync_playwright
 
 from lib import BASE, CREDS, PREFIX, Checks, png
+from totp import browser_mfa
 
 SHOTS = os.environ.get('SHOTS', 'shots')
 os.makedirs(SHOTS, exist_ok=True)
@@ -41,6 +42,7 @@ def login(br, user, pw, mobile=False, init_script=None):
     p.fill('input[name="login_password"]', pw)
     p.press('input[name="login_password"]', 'Enter')
     p.wait_for_load_state('networkidle')
+    browser_mfa(p, user)
     return p
 
 

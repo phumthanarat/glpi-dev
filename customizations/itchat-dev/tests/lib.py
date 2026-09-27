@@ -17,7 +17,10 @@ import requests
 BASE = os.environ.get('GLPI_URL', 'http://localhost:30080').rstrip('/')
 API = BASE + '/plugins/itchat/ajax/chat.php'
 CREDS = json.loads(os.environ.get('ITCHAT_TEST_CREDS', '{}'))
-ADMIN = (os.environ.get('ADMIN_USER', 'glpi'), os.environ.get('ADMIN_PASS', 'glpi'))
+# Super-Admin: the fixture account itchat.test.admin (with 2FA) unless ADMIN_USER / ADMIN_PASS say otherwise
+ADMIN = ((os.environ['ADMIN_USER'], os.environ.get('ADMIN_PASS', '')) if os.environ.get('ADMIN_USER')
+         else ('itchat.test.admin', CREDS['itchat.test.admin']) if 'itchat.test.admin' in CREDS
+         else ('glpi', os.environ.get('ADMIN_PASS', 'glpi')))
 PREFIX = '[itchat-test]'
 
 
@@ -32,9 +35,16 @@ def login(name, password=None):
     s.login_name = name
     page = s.get(BASE + '/').text
     token = re.search(r'name="_glpi_csrf_token" value="([^"]+)"', page).group(1)
-    s.post(BASE + '/front/login.php', data={
+    r = s.post(BASE + '/front/login.php', data={
         'login_name': name, 'login_password': password, '_glpi_csrf_token': token, 'noAUTO': 1,
     })
+    if '/MFA/Prompt' in r.url:  # 2FA (setup-24): answer with the account's TOTP code
+        from totp import fresh_code, secret_for
+        secret = secret_for(name)
+        if not secret:
+            raise RuntimeError(f'MFA prompt for {name} but no TOTP secret')
+        mfa_token = re.search(r'name="_glpi_csrf_token" value="([^"]+)"', r.text).group(1)
+        s.post(BASE + '/MFA/Verify', data={'totp_code': fresh_code(secret), '_glpi_csrf_token': mfa_token})
     page = s.get(BASE + '/front/central.php').text
     if 'glpi:csrf_token' not in page:
         page = s.get(BASE + '/Helpdesk').text

@@ -145,6 +145,23 @@ if [ $SKIP_K8S != 1 ]; then
     kx get secret glpi-tls >/dev/null 2>&1 || kx create secret generic glpi-tls --type=kubernetes.io/tls \
         --from-literal=tls.crt= --from-literal=tls.key=
     kx get secret glpi-tls-ca >/dev/null 2>&1 || kx create secret generic glpi-tls-ca
+    # alert settings of glpi-monitor, created once from install.env; afterwards edited on
+    # Setup > Monitoring in GLPI (never overwritten here)
+    if ! kx get secret glpi-monitor >/dev/null 2>&1; then
+        kx create secret generic glpi-monitor \
+            --from-literal=SITE_NAME="${MONITOR_SITE_NAME:-GLPI ITSM}" \
+            --from-literal=PUBLIC_URL="https://$INGRESS_HOST" \
+            --from-literal=PUBLIC_CONNECT="${MONITOR_PUBLIC_CONNECT:-$INGRESS_HOST:443}" \
+            --from-literal=MONITOR_TOKEN="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
+            --from-literal=INTERVAL="60" --from-literal=HEARTBEAT_HOUR="${ALERT_HEARTBEAT_HOUR:-8}" \
+            --from-literal=SMTP_HOST="${SMTP_HOST:-}" --from-literal=SMTP_PORT="${SMTP_PORT:-587}" \
+            --from-literal=SMTP_USER="${SMTP_USER:-}" --from-literal=SMTP_PASSWORD="${SMTP_PASSWORD:-}" \
+            --from-literal=SMTP_VERIFY_CERT="${SMTP_VERIFY_CERT:-1}" --from-literal=SMTP_FROM="${MAIL_FROM:-}" \
+            --from-literal=ALERT_EMAILS="${ALERT_EMAILS:-}" --from-literal=ALERT_TEAMS_URL="${ALERT_TEAMS_URL:-}" \
+            --from-literal=ALERT_GCHAT_URL="${ALERT_GCHAT_URL:-}" --from-literal=ALERT_SLACK_URL="${ALERT_SLACK_URL:-}" \
+            --from-literal=ALERT_LINE_TOKEN="${ALERT_LINE_TOKEN:-}" --from-literal=ALERT_LINE_TO="${ALERT_LINE_TO:-}" \
+            --from-literal=ALERT_WEBHOOK_URL="${ALERT_WEBHOOK_URL:-}"
+    fi
     if [ -n "${MAIL_INTAKE_HOST:-}" ]; then
         kx create secret generic mail-intake \
             --from-literal=MAIL_INTAKE_HOST="$MAIL_INTAKE_HOST" --from-literal=MAIL_INTAKE_ADDRESS="${MAIL_INTAKE_ADDRESS:-}" \
@@ -253,7 +270,7 @@ REMOTE=/tmp/itsm-install
 copy_scripts() {
     kx exec "$POD" -c "$CONTAINER" -- rm -rf "$REMOTE"
     kx exec "$POD" -c "$CONTAINER" -- mkdir -p "$REMOTE"
-    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' --exclude='itbackup' --exclude='itbackup-dev' --exclude='ithttps' --exclude='ithttps-dev' \
+    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' --exclude='itbackup' --exclude='itbackup-dev' --exclude='ithttps' --exclude='ithttps-dev' --exclude='itsecurity' --exclude='itsecurity-dev' --exclude='itmonitor' --exclude='itmonitor-dev' \
         --exclude='mailpit-config-form' --exclude='community-plugins' --exclude='seed-*' --exclude='*.sql' --exclude='BACKUP_*' -cf - . \
         | kx exec -i "$POD" -c "$CONTAINER" -- tar -C "$REMOTE" -xf -
 }
@@ -281,11 +298,13 @@ run setup-11-mail.php SMTP_HOST="${SMTP_HOST:-}" SMTP_PORT="${SMTP_PORT:-587}" S
     MAIL_FROM="${MAIL_FROM:-}" MAIL_FROM_NAME="${MAIL_FROM_NAME:-}"
 for s in setup-12-line-webhook setup-13-chat-webhooks setup-14-google-chat-webhook; do run "$s.php"; done
 
-step "5b. plugins: IT Chat + IT QR + IT Backup + IT HTTPS"
+step "5b. plugins: IT Chat, IT QR, IT Backup, IT HTTPS, IT Security, IT Monitor"
 NS=$NAMESPACE "$HERE/customizations/itchat-dev/deploy.sh" --no-ui-check | grep -E '^\S|==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itqr-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itbackup-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/ithttps-dev/deploy.sh" | grep -E '==|deployed|ERROR'
+NS=$NAMESPACE "$HERE/customizations/itsecurity-dev/deploy.sh" | grep -E '==|deployed|ERROR'
+NS=$NAMESPACE "$HERE/customizations/itmonitor-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 step "5b2. community plugins (customizations/community-plugins.txt)"
 NS=$NAMESPACE "$HERE/customizations/community-plugins/deploy.sh" | grep -vE '^\s*$'
 POD=$(live_pod); copy_scripts   # the plugin deploys may have restarted the pods
@@ -301,6 +320,8 @@ fi
 run setup-20-central-source-phone.php
 run setup-22-list-columns.php
 run setup-23-https.php TLS_HOSTS="$INGRESS_HOST"
+run setup-24-login-security.php IDLE_TIMEOUT_MINUTES="${IDLE_TIMEOUT_MINUTES:-60}" \
+    TFA_PROFILES="${TFA_PROFILES:-Super-Admin,Admin,Supervisor,Technician,Hotliner}" TFA_GRACE_DAYS="${TFA_GRACE_DAYS:-7}"
 
 step "5d. branding"
 for s in logo/apply-logo watermark/apply-watermark topbar-modern/apply-topbar dashboard-modern/apply-dashboard \
