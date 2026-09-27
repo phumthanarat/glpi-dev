@@ -12,7 +12,9 @@
 #   4. waits for the app to be ready
 #   5. configuration inside a pod, in order: URL, ITSM setup-01..20 (calendar, teams,
 #      categories, SLA, rules, approvals, notifications + SMTP, dashboard, request sources,
-#      e-mail channel if set), IT Chat + IT QR plugins, branding, daily summary script
+#      e-mail channel if set), IT Chat + IT QR plugins, community plugins (OAuth IMAP,
+#      Escalade, Fields, Data Injection, Tag: customizations/community-plugins.txt),
+#      branding, daily summary script
 #   6. security: new 'glpi' admin password, default accounts deactivated
 #   7. checks the app answers
 #
@@ -244,7 +246,7 @@ copy_scripts() {
     kx exec "$POD" -c "$CONTAINER" -- rm -rf "$REMOTE"
     kx exec "$POD" -c "$CONTAINER" -- mkdir -p "$REMOTE"
     tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' \
-        --exclude='mailpit-config-form' --exclude='seed-*' --exclude='*.sql' --exclude='BACKUP_*' -cf - . \
+        --exclude='mailpit-config-form' --exclude='community-plugins' --exclude='seed-*' --exclude='*.sql' --exclude='BACKUP_*' -cf - . \
         | kx exec -i "$POD" -c "$CONTAINER" -- tar -C "$REMOTE" -xf -
 }
 run() {  # run <script> [VAR=value ...]
@@ -274,6 +276,8 @@ for s in setup-12-line-webhook setup-13-chat-webhooks setup-14-google-chat-webho
 step "5b. plugins: IT Chat + IT QR"
 NS=$NAMESPACE "$HERE/customizations/itchat-dev/deploy.sh" --no-ui-check | grep -E '^\S|==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itqr-dev/deploy.sh" | grep -E '==|deployed|ERROR'
+step "5b2. community plugins (customizations/community-plugins.txt)"
+NS=$NAMESPACE "$HERE/customizations/community-plugins/deploy.sh" | grep -vE '^\s*$'
 POD=$(live_pod); copy_scripts   # the plugin deploys may have restarted the pods
 
 step "5c. ITSM configuration that needs the plugins"

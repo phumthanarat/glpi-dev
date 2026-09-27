@@ -170,6 +170,22 @@ modern. See each one's own README:
 [watermark](./watermark/README.md),
 [rebrand-it-dev](./rebrand-it-dev/README.md).
 
+## Community plugins (`community-plugins.txt`)
+
+Installed by `install.sh` through `community-plugins/deploy.sh`, pinned by version + sha256
+(a changed download is refused), all checked for GLPI 11.0.x:
+
+| Plugin | Why |
+|---|---|
+| **OAuth IMAP** 1.5.4 | lets the Mail Receiver (setup-19) read a Microsoft 365 / Google mailbox, which no longer accept IMAP passwords. Setup > OAuth IMAP applications |
+| **Escalade** 2.10.8 | escalation between the teams (Helpdesk -> Network / System / Application) with its history |
+| **Fields** 1.24.5 | custom fields on tickets, assets, users (employee id, department, asset number...) without code |
+| **Data Injection** 2.15.11 | CSV import (assets, users) for go-live; then print the QR labels |
+| **Tag** 2.14.7 | tags on tickets and assets (VIP, project...) |
+
+To add or upgrade one: edit the line (URL + `sha256sum` of the tarball), re-run `install.sh`.
+Offline install: put the tarballs in `~/.cache/glpi-itsm/plugins/` (or `PLUGIN_CACHE`) first.
+
 ## `itqr/` — QR labels: scan to report a problem
 
 GLPI 11 plugin. Technicians print QR labels from an asset's **QR แจ้งปัญหา** tab (or the

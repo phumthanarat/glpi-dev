@@ -1,0 +1,11 @@
+# GLPI community plugins installed by install.sh (customizations/community-plugins/deploy.sh).
+# Pinned: version, release URL and sha256 of the tarball; a download that doesn't match is refused.
+# All checked for GLPI 11.0.x (MIN/MAX_GLPI in their setup.php). To upgrade one: change the
+# line (new URL + sha256 from `sha256sum`), then re-run install.sh.
+#
+# name           version  sha256                                                            url
+oauthimap        1.5.4    0bb11f0ba07b7e3aa0bafadec68d736e932d0ab0b9edc9c7c12f96edc5df989d  https://github.com/pluginsGLPI/oauthimap/releases/download/1.5.4/glpi-oauthimap-1.5.4.tar.bz2
+escalade         2.10.8   c089260c0a928110844391b5df7800abf53d0fa17094a3223c046b3202a02dc0  https://github.com/pluginsGLPI/escalade/releases/download/2.10.8/glpi-escalade-2.10.8.tar.bz2
+fields           1.24.5   d932a550e48ffedeceeb5638cd4c116faddba312091e6bd29f8c0091a096c28e  https://github.com/pluginsGLPI/fields/releases/download/1.24.5/glpi-fields-1.24.5.tar.bz2
+datainjection    2.15.11  76099b1ea169bfe6862767e8d6e78e2b7229a4f36c71c2d780aa7cf933deb857  https://github.com/pluginsGLPI/datainjection/releases/download/2.15.11/glpi-datainjection-2.15.11.tar.bz2
+tag              2.14.7   c04efa53abf567e51b0d7185d5a9728f0ff590bdb7644c59e3c6579704d036f9  https://github.com/pluginsGLPI/tag/releases/download/2.14.7/glpi-tag-2.14.7.tar.bz2
