@@ -1,0 +1,50 @@
+# Daily GLPI backup (database + files) by the IT Backup plugin
+# (customizations/itbackup, bin/backup.php), onto the glpi-backups volume.
+# Also shown / started from GLPI: Setup > Backups.
+#
+# Its own CronJob, not glpi-cron: a backup can take longer than glpi-cron's 110 s deadline.
+# 02:00 Bangkok time; retention (keep_days) is set on the Backups page.
+# The glpi-backups PVC is defined per overlay (local-dev: hostPath RWO, production: Longhorn RWX,
+# since the app pods mount it too for "Backup now" and downloads).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: glpi-backup
+  namespace: glpi
+spec:
+  schedule: "0 2 * * *"
+  timeZone: Asia/Bangkok
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 33
+          containers:
+            - name: backup
+              image: glpi:11.0
+              imagePullPolicy: IfNotPresent
+              command: ["php", "plugins/itbackup/bin/backup.php", "scheduled"]
+              workingDir: /var/www/glpi
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { memory: 512Mi }
+              volumeMounts:
+                - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
+                - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
+                - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
+                - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+                - { name: glpi-backups, mountPath: /var/lib/glpi-backups }
+          volumes:
+            - name: glpi-data
+              persistentVolumeClaim:
+                claimName: glpi-data
+            - name: glpi-backups
+              persistentVolumeClaim:
+                claimName: glpi-backups

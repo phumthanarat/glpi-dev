@@ -1,0 +1,11 @@
+# Backups of GLPI (IT Backup plugin), separate from the data volume.
+# hostPath, single node: copy them off this machine too (see customizations/itbackup/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glpi-backups
+  namespace: glpi
+spec:
+  storageClassName: hostpath
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 10Gi } }

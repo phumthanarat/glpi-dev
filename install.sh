@@ -245,7 +245,7 @@ REMOTE=/tmp/itsm-install
 copy_scripts() {
     kx exec "$POD" -c "$CONTAINER" -- rm -rf "$REMOTE"
     kx exec "$POD" -c "$CONTAINER" -- mkdir -p "$REMOTE"
-    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' \
+    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' --exclude='itbackup' --exclude='itbackup-dev' \
         --exclude='mailpit-config-form' --exclude='community-plugins' --exclude='seed-*' --exclude='*.sql' --exclude='BACKUP_*' -cf - . \
         | kx exec -i "$POD" -c "$CONTAINER" -- tar -C "$REMOTE" -xf -
 }
@@ -273,9 +273,10 @@ run setup-11-mail.php SMTP_HOST="${SMTP_HOST:-}" SMTP_PORT="${SMTP_PORT:-587}" S
     MAIL_FROM="${MAIL_FROM:-}" MAIL_FROM_NAME="${MAIL_FROM_NAME:-}"
 for s in setup-12-line-webhook setup-13-chat-webhooks setup-14-google-chat-webhook; do run "$s.php"; done
 
-step "5b. plugins: IT Chat + IT QR"
+step "5b. plugins: IT Chat + IT QR + IT Backup"
 NS=$NAMESPACE "$HERE/customizations/itchat-dev/deploy.sh" --no-ui-check | grep -E '^\S|==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itqr-dev/deploy.sh" | grep -E '==|deployed|ERROR'
+NS=$NAMESPACE "$HERE/customizations/itbackup-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 step "5b2. community plugins (customizations/community-plugins.txt)"
 NS=$NAMESPACE "$HERE/customizations/community-plugins/deploy.sh" | grep -vE '^\s*$'
 POD=$(live_pod); copy_scripts   # the plugin deploys may have restarted the pods

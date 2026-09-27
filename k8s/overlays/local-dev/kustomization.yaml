@@ -6,6 +6,7 @@ namespace: glpi
 resources:
   - ../../base
   - pvc.yaml
+  - backup-pvc.yaml
   - service-nodeport.yaml
   - mariadb-pvc.yaml
   - mariadb-deployment.yaml

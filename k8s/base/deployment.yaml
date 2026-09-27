@@ -88,8 +88,13 @@ spec:
             - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
             - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
             - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+            # IT Backup: Setup > Backups lists / downloads / starts backups here
+            - { name: glpi-backups, mountPath: /var/lib/glpi-backups }
 
       volumes:
         - name: glpi-data
           persistentVolumeClaim:
             claimName: glpi-data
+        - name: glpi-backups
+          persistentVolumeClaim:
+            claimName: glpi-backups

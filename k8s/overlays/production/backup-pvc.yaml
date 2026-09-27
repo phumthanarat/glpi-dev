@@ -1,0 +1,12 @@
+# Backups of GLPI (IT Backup plugin), separate from the data volume. RWX: the app pods (on any
+# node) and the glpi-backup CronJob mount it. Longhorn replicates it across nodes; still copy
+# backups off the cluster (see customizations/itbackup/README.md).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glpi-backups
+  namespace: glpi
+spec:
+  storageClassName: longhorn-glpi
+  accessModes: [ReadWriteMany]
+  resources: { requests: { storage: 20Gi } }

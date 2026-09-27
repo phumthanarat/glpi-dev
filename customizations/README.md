@@ -170,6 +170,12 @@ modern. See each one's own README:
 [watermark](./watermark/README.md),
 [rebrand-it-dev](./rebrand-it-dev/README.md).
 
+## `itbackup/` — backups + Setup > Backups page
+
+Daily database + files backups (`glpi-backup` CronJob, 02:00) onto their own volume, and a page
+for admins: status, Backup now, download, delete, retention. Restore stays on the command line.
+Details: [`itbackup/README.md`](./itbackup/README.md).
+
 ## Community plugins (`community-plugins.txt`)
 
 Installed by `install.sh` through `community-plugins/deploy.sh`, pinned by version + sha256
