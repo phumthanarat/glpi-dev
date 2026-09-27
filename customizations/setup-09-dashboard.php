@@ -50,6 +50,9 @@ $auth->auth_succeded = true;
 $auth->user_present  = true;
 Session::init($auth);
 
+// GLPI's sample dashboards off: only the real ones (incl. "IT Helpdesk KPI" below)
+Config::setConfigurationValues('core', ['is_demo_dashboards' => 0]);
+
 function card(string $card_id, int $x, int $y, int $w, int $h, string $widgettype, string $color): array
 {
     return [

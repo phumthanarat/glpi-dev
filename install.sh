@@ -69,7 +69,8 @@ for v in IMAGE GLPI_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD GLPI_ADMIN_P
 done
 [ ${#GLPI_ADMIN_PASSWORD} -ge 12 ] || die "GLPI_ADMIN_PASSWORD must be 12+ characters"
 [[ "$GLPI_URL" =~ ^https?://[^/]+ ]] || die "GLPI_URL must look like https://itsm.company.com"
-INGRESS_HOST=$(echo "$GLPI_URL" | sed -E 's#^https?://([^/:]+).*#\1#')
+# Ingress host: from GLPI_URL unless set (e.g. GLPI_URL on a NodePort, Ingress on a name)
+INGRESS_HOST=${INGRESS_HOST:-$(echo "$GLPI_URL" | sed -E 's#^https?://([^/:]+).*#\1#')}
 for t in kubectl docker python3 curl; do command -v $t >/dev/null || die "$t is required"; done
 [ -d "$HERE/$OVERLAY" ] || die "overlay $OVERLAY not found"
 
@@ -246,7 +247,7 @@ run() {  # run <script> [VAR=value ...]
 
 step "5. configuration (pod $POD)"
 copy_scripts
-run setup-00-base-url.php GLPI_URL="$GLPI_URL"
+run setup-00-base-url.php GLPI_URL="$GLPI_URL" GLPI_TIMEZONE="${GLPI_TIMEZONE:-Asia/Bangkok}" GLPI_LANGUAGE="$GLPI_LANGUAGE"
 for s in setup-01-calendar setup-02-groups setup-03-categories setup-04-sla setup-05-business-rules \
          setup-06-escalation setup-07-notifications setup-08-incident-request-approval setup-09-dashboard setup-10-cron; do
     run "$s.php"

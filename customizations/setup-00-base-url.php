@@ -1,7 +1,9 @@
 <?php
 
 /**
- * GLPI's public address ("URL of the application", Setup > General), from env GLPI_URL,
+ * Base settings: default timezone (GLPI_TIMEZONE, default Asia/Bangkok) and language
+ * (GLPI_LANGUAGE, default en_GB), and GLPI's public address ("URL of the application",
+ * Setup > General), from env GLPI_URL,
  * e.g. https://itsm.company.com. Links in notification e-mails, webhook payloads
  * (setup-12..14 bake it in when they create them, hence step 00) and QR labels (itqr) use it.
  *
@@ -32,5 +34,7 @@ $auth->auth_succeded = true;
 $auth->user_present  = true;
 Session::init($auth);
 
-Config::setConfigurationValues('core', ['url_base' => $url]);
-echo "url_base = $url\n";
+$timezone = getenv('GLPI_TIMEZONE') ?: 'Asia/Bangkok';
+$language = getenv('GLPI_LANGUAGE') ?: 'en_GB';
+Config::setConfigurationValues('core', ['url_base' => $url, 'timezone' => $timezone, 'language' => $language]);
+echo "url_base = $url, timezone = $timezone, language = $language\n";

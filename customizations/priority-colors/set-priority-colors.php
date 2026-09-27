@@ -11,9 +11,9 @@
  * Replaced with a proper red -> green severity scale (Major=red,
  * calming down to Very Low=green) - the standard severity/heat-map
  * convention (PagerDuty, Datadog, etc.), immediately legible:
- *   1 Very Low  #22c55e (green)     4 High      #f59e0b (amber)
+ *   1 Very Low  #22c55e (green)     4 High      #d97706 (amber)
  *   2 Low       #84cc16 (lime)      5 Very High #f97316 (orange)
- *   3 Medium    #eab308 (yellow)    6 Major     #dc2626 (red)
+ *   3 Medium    #ca8a04 (yellow)    6 Major     #dc2626 (red)
  *
  * This changes the color EVERYWHERE GLPI renders a priority badge
  * (ticket/problem/change lists, Kanban cards, timelines, Project) -
@@ -59,8 +59,8 @@ echo "Previous colors backed up to priority-colors/BACKUP_previous_colors.php\n"
 Config::setConfigurationValues('core', [
     'priority_1' => '#22c55e', // Very Low - green
     'priority_2' => '#84cc16', // Low - lime
-    'priority_3' => '#eab308', // Medium - yellow
-    'priority_4' => '#f59e0b', // High - amber
+    'priority_3' => '#ca8a04', // Medium - dark yellow (readable text on white)
+    'priority_4' => '#d97706', // High - dark amber
     'priority_5' => '#f97316', // Very High - orange
     'priority_6' => '#dc2626', // Major - red
 ]);

@@ -85,6 +85,9 @@ if (!$ok) {
     exit(1);
 }
 
+// The styling targets GLPI's horizontal layout (menu in the top bar); make it the default
+// layout (users who picked their own layout in their preferences keep it)
+Config::setConfigurationValues('core', ['page_layout' => 'horizontal']);
 echo "Applied. Top nav (horizontal page_layout) now has the modern styling.\n";
 echo "Revert: run the SQL in topbar-modern/BACKUP_previous_state.sql, or clear it in\n";
 echo "Administration > Entities > Root entity > Configuration.\n";
