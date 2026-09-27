@@ -15,9 +15,15 @@ metadata:
   name: glpi-app
   namespace: glpi
   annotations:
+    # HTTPS only: plain HTTP is redirected (certificate: Secret glpi-tls, Setup > HTTPS)
+    konghq.com/protocols: https
+    konghq.com/https-redirect-status-code: "301"
     konghq.com/strip-path: "false"
 spec:
   ingressClassName: kong
+  tls:
+    - hosts: [dev.glpi.labs]
+      secretName: glpi-tls
   rules:
     - host: dev.glpi.labs
       http:

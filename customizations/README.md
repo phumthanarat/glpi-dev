@@ -45,6 +45,7 @@ IDs).
 | 20 | `setup-20-central-source-phone.php` | Ticket template **Central (technicians)** (Default's mandatory/hidden fields + request source predefined = **Phone**) on the Technician / Hotliner / Supervisor profiles, so every channel has its own source for reports: Helpdesk forms -> Helpdesk, e-mail -> E-Mail, IT Chat -> **Chat** (itchat 1.7.0), QR -> QR code, Central "+ Add" -> Phone (the technician can change it). Verified by `run.sh central` and `run.sh load` | Assistance > Ticket templates; Administration > Profiles > (profile) > Ticket template |
 | 21 | `setup-21-security.php` | Closes GLPI's public default logins: sets the `glpi` Super-Admin password from `GLPI_ADMIN_PASSWORD` (12+ chars, GLPI's password policy applies) and deactivates `tech` / `normal` / `post-only` (`KEEP_DEFAULT_ACCOUNTS=1` keeps them). Run last by `install.sh` | Administration > Users |
 | 22 | `setup-22-list-columns.php` | Default columns of the Ticket / Problem / Change lists for technicians (Central): ID, title, entity, status, time to resolve (+ to own) with progress, last update, opening date, priority, requester, technician, category, SLA exceeded. Users' own column choices are kept | Search list > wrench icon (Select default items to show) |
+| 23 | `setup-23-https.php` | HTTPS from the first install: if the Ingress has no certificate yet, issues one from the internal CA for `TLS_HOSTS` (install.sh passes the Ingress host). Never replaces an existing / uploaded certificate. Needs the ithttps plugin | Setup > HTTPS |
 | — | `daily-summary/send-daily-summary.php` + `k8s/base/daily-summary-cronjob.yaml` | Scheduled daily rollup (tickets/changes opened today, open/overdue/solved counts — same numbers the dashboard shows, same provider functions) pushed to LINE/Slack/Discord/Google Chat. Separate mechanism from setup-12/13's per-ticket Webhooks: no event-trigger fits "once a day", so this is a k8s CronJob (18:00 Asia/Bangkok, **suspended** until a real token is set) running a script deployed onto the `glpi-data` PVC — see the CronJob's own comments for why (not a ConfigMap: kustomize blocks referencing files outside `k8s/`) and the exact deploy command | Setup > Webhooks doesn't cover this one — edit `$CHANNELS` directly in the script |
 
 No separate script exists for the plan's items 9 (Self-Service Portal)
@@ -169,6 +170,11 @@ modern. See each one's own README:
 [topbar-modern](./topbar-modern/README.md), [logo](./logo/README.md),
 [watermark](./watermark/README.md),
 [rebrand-it-dev](./rebrand-it-dev/README.md).
+
+## `ithttps/` — HTTPS certificate, Setup > HTTPS
+
+Upload the organisation's certificate (.crt+.key or .pfx) or use an internal CA (auto-renewed,
+CA downloadable for AD GPO); HTTP redirects to HTTPS. Details: [`ithttps/README.md`](./ithttps/README.md).
 
 ## `itbackup/` — backups + Setup > Backups page
 

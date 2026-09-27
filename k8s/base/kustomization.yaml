@@ -9,6 +9,7 @@ resources:
   - cronjob.yaml
   - daily-summary-cronjob.yaml
   - backup-cronjob.yaml
+  - https-rbac.yaml
 
 # secret-db-external.example.yaml is NOT listed here on purpose — it's a
 # template, not something to apply. Create the real "db-external" Secret

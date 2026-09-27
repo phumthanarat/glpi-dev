@@ -10,6 +10,7 @@
 #   tests/run.sh helpdesk    tickets filed through the real Helpdesk forms in a browser
 #   tests/run.sh central     a technician opens tickets for requesters from the Central form
 #   tests/run.sh backup      IT Backup: Setup > Backups page, Backup now, downloads, CronJob, retention, rights
+#   tests/run.sh https       IT HTTPS through the real Ingress: internal CA, upload .crt/.key/.pfx, redirect, Secure cookie
 #   tests/run.sh qr          QR labels (itqr plugin): asset tab, labels page, scan -> report on a phone
 #   tests/run.sh load        LOAD_PER_CHANNEL (400) tickets through each of the 5 channels, all checked
 #                            against the rules (not part of full: ~30-40 min, leaves a mail backlog)
@@ -92,7 +93,7 @@ case "$MODE" in
     smoke)    run "flow x3" py test_flow.py 3; run security py test_security.py; run features py test_features.py; run collab py test_collab.py ;;
     # email first: flow x30 queues hundreds of notification e-mails, and the e-mail test waits
     # for GLPI's confirmation e-mail, which would sit behind that backlog
-    full)     run email py test_email.py; run "flow x30" py test_flow.py 30; run security py test_security.py; run features py test_features.py; run collab py test_collab.py; run tickets py test_tickets.py; run helpdesk py test_helpdesk.py; run central py test_central.py; run qr py test_qr.py; run backup py test_backup.py; run backup-remote py test_backup_remote.py; run ui ui ;;
+    full)     run email py test_email.py; run "flow x30" py test_flow.py 30; run security py test_security.py; run features py test_features.py; run collab py test_collab.py; run tickets py test_tickets.py; run helpdesk py test_helpdesk.py; run central py test_central.py; run qr py test_qr.py; run backup py test_backup.py; run backup-remote py test_backup_remote.py; run https py test_https.py; run ui ui ;;
     features) run features py test_features.py ;;
     collab)   run collab py test_collab.py ;;
     tickets)  run tickets py test_tickets.py ;;
@@ -102,11 +103,12 @@ case "$MODE" in
     qr)       run qr py test_qr.py ;;
     backup)   run backup py test_backup.py; run backup-remote py test_backup_remote.py ;;
     backup-remote) run backup-remote py test_backup_remote.py ;;
+    https)    run https py test_https.py ;;
     load)     run load py test_load.py ;;
     flow)     run "flow x${2:-3}" py test_flow.py "${2:-3}" ;;
     security) run security py test_security.py ;;
     ui)       run ui ui ;;
-    *) echo "usage: $0 smoke|full|flow [N]|security|features|collab|tickets|helpdesk|central|email|qr|backup|load|ui" >&2; exit 2 ;;
+    *) echo "usage: $0 smoke|full|flow [N]|security|features|collab|tickets|helpdesk|central|email|qr|backup|https|load|ui" >&2; exit 2 ;;
 esac
 
 echo

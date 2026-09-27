@@ -8,6 +8,9 @@ metadata:
   name: glpi-app
   namespace: glpi
   annotations:
+    # HTTPS only: plain HTTP is redirected (certificate: Secret glpi-tls, Setup > HTTPS)
+    konghq.com/protocols: https
+    konghq.com/https-redirect-status-code: "301"
     konghq.com/strip-path: "false"
     # TLS: once cert-manager (or another ACME client) is set up on the
     # target cluster, add:
@@ -15,6 +18,9 @@ metadata:
     # and a `tls:` block below pointing at a Secret it creates.
 spec:
   ingressClassName: kong
+  tls:
+    - hosts: [glpi.example.com]
+      secretName: glpi-tls
   rules:
     - host: glpi.example.com
       http:

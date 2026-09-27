@@ -28,6 +28,7 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          serviceAccountName: glpi-app   # renews an internal HTTPS certificate (ithttps)
           securityContext:
             fsGroup: 33
           containers:

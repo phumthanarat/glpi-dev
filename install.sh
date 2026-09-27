@@ -140,6 +140,11 @@ if [ $SKIP_K8S != 1 ]; then
             --from-literal=MARIADB_PASSWORD="$DB_PASSWORD" --from-literal=MARIADB_ROOT_PASSWORD="$root_pw" \
             --dry-run=client -o yaml | kubectl apply -f -
     fi
+    # HTTPS certificate Secrets, created empty once (Setup > HTTPS / setup-23 fill them; the app
+    # may only update these two, not create - see k8s/base/https-rbac.yaml). Never overwritten.
+    kx get secret glpi-tls >/dev/null 2>&1 || kx create secret generic glpi-tls --type=kubernetes.io/tls \
+        --from-literal=tls.crt= --from-literal=tls.key=
+    kx get secret glpi-tls-ca >/dev/null 2>&1 || kx create secret generic glpi-tls-ca
     if [ -n "${MAIL_INTAKE_HOST:-}" ]; then
         kx create secret generic mail-intake \
             --from-literal=MAIL_INTAKE_HOST="$MAIL_INTAKE_HOST" --from-literal=MAIL_INTAKE_ADDRESS="${MAIL_INTAKE_ADDRESS:-}" \
@@ -167,6 +172,9 @@ patches:
     patch: |-
       - op: replace
         path: /spec/rules/0/host
+        value: $INGRESS_HOST
+      - op: replace
+        path: /spec/tls/0/hosts/0
         value: $INGRESS_HOST
 EOF
     kubectl apply -k "$GEN"
@@ -245,7 +253,7 @@ REMOTE=/tmp/itsm-install
 copy_scripts() {
     kx exec "$POD" -c "$CONTAINER" -- rm -rf "$REMOTE"
     kx exec "$POD" -c "$CONTAINER" -- mkdir -p "$REMOTE"
-    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' --exclude='itbackup' --exclude='itbackup-dev' \
+    tar -C "$HERE/customizations" --exclude='itchat-dev' --exclude='itqr-dev' --exclude='itchat' --exclude='itqr' --exclude='itbackup' --exclude='itbackup-dev' --exclude='ithttps' --exclude='ithttps-dev' \
         --exclude='mailpit-config-form' --exclude='community-plugins' --exclude='seed-*' --exclude='*.sql' --exclude='BACKUP_*' -cf - . \
         | kx exec -i "$POD" -c "$CONTAINER" -- tar -C "$REMOTE" -xf -
 }
@@ -273,10 +281,11 @@ run setup-11-mail.php SMTP_HOST="${SMTP_HOST:-}" SMTP_PORT="${SMTP_PORT:-587}" S
     MAIL_FROM="${MAIL_FROM:-}" MAIL_FROM_NAME="${MAIL_FROM_NAME:-}"
 for s in setup-12-line-webhook setup-13-chat-webhooks setup-14-google-chat-webhook; do run "$s.php"; done
 
-step "5b. plugins: IT Chat + IT QR + IT Backup"
+step "5b. plugins: IT Chat + IT QR + IT Backup + IT HTTPS"
 NS=$NAMESPACE "$HERE/customizations/itchat-dev/deploy.sh" --no-ui-check | grep -E '^\S|==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itqr-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 NS=$NAMESPACE "$HERE/customizations/itbackup-dev/deploy.sh" | grep -E '==|deployed|ERROR'
+NS=$NAMESPACE "$HERE/customizations/ithttps-dev/deploy.sh" | grep -E '==|deployed|ERROR'
 step "5b2. community plugins (customizations/community-plugins.txt)"
 NS=$NAMESPACE "$HERE/customizations/community-plugins/deploy.sh" | grep -vE '^\s*$'
 POD=$(live_pod); copy_scripts   # the plugin deploys may have restarted the pods
@@ -291,6 +300,7 @@ else
 fi
 run setup-20-central-source-phone.php
 run setup-22-list-columns.php
+run setup-23-https.php TLS_HOSTS="$INGRESS_HOST"
 
 step "5d. branding"
 for s in logo/apply-logo watermark/apply-watermark topbar-modern/apply-topbar dashboard-modern/apply-dashboard \

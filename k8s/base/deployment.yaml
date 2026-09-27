@@ -15,6 +15,7 @@ spec:
       labels:
         app: glpi-app
     spec:
+      serviceAccountName: glpi-app   # Setup > HTTPS updates the Ingress certificate (https-rbac.yaml)
       securityContext:
         # PVC-backed subPaths are created root-owned by default; this makes
         # them group-writable by www-data (uid/gid 33 in the image) so the
