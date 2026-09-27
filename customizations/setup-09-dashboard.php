@@ -90,6 +90,8 @@ $items = [
     // Row 4: trends
     card('ticket_times',    0, 11, 6, 3, 'areas', '#f3f7f8'),
     card('ticket_evolution', 6, 11, 6, 3, 'areas', '#f3f7f8'),
+    // Row 14: open Changes (setup-16 then adds the IT Chat cards below it)
+    card('bn_count_Change', 0, 14, 3, 2, 'bigNumber', '#0d9488'),
 ];
 
 $dashboard = new Glpi\Dashboard\Dashboard();

@@ -271,6 +271,7 @@ else
     echo "  setup-19-mail-intake.php                         skipped (MAIL_INTAKE_HOST not set)"
 fi
 run setup-20-central-source-phone.php
+run setup-22-list-columns.php
 
 step "5d. branding"
 for s in logo/apply-logo watermark/apply-watermark topbar-modern/apply-topbar dashboard-modern/apply-dashboard \
