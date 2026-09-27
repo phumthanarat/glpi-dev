@@ -64,3 +64,7 @@ phpstan.neon
 /install.env
 /k8s/.install/
 /k8s/.install-test/
+
+# Python bytecode
+__pycache__/
+*.pyc
