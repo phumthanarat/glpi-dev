@@ -1,0 +1,63 @@
+# VCS / CI
+.git
+.github
+.gitignore
+.gitattributes
+
+# Docker itself
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+.dockerignore
+.docker
+.devcontainer
+
+# Dependencies (installed inside the image, never trust the host copy)
+/vendor
+/node_modules
+
+# Front-end build output (rebuilt inside the image)
+/public/build
+/public/lib
+/public/js
+/public/css_compiled
+/css/lib
+
+# Runtime / user data (must live in volumes, not in the image)
+/files/*
+!/files/*/.gitkeep
+/config/*
+!/config/.gitkeep
+/marketplace/*
+!/marketplace/.gitkeep
+/plugins/*
+!/plugins/.gitkeep
+
+# Tests, tooling, docs (not needed at runtime)
+# NOTE: tools/patches/ is kept — composer & npm post-install scripts apply
+# patches from it during the build stages (see Dockerfile).
+/tests
+/tools/src
+/tools/bin
+/.tx
+*.md
+!INSTALL.md
+phpunit.xml*
+phpstan*.neon*
+phpstan*.php
+.php-cs-fixer.dist.php
+composer-dependency-analyser.php
+eslint.config.mjs
+.eslintrc*
+.stylelintrc.js
+.vscode
+.idea
+
+# Misc local artifacts
+*.log
+.DS_Store
+.env
+.package.hash
+.composer.hash
+nano
+/secrets

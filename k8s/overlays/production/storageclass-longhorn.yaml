@@ -1,0 +1,18 @@
+# Requires the Longhorn CSI driver to already be installed on the target
+# cluster (Longhorn's own Helm chart creates a default "longhorn"
+# StorageClass too — this one just pins the replica count explicitly for
+# a 3-worker cluster instead of relying on the chart's default).
+#
+# Install Longhorn first (see ../../INSTALL-production.md), then:
+#   kubectl apply -f storageclass-longhorn.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-glpi
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "30"

@@ -44,7 +44,8 @@ global $CFG_GLPI;
 $CFG_GLPI = [];
 
 // set the default app_name
-$CFG_GLPI['app_name'] = 'GLPI';
+// IT-DEV rebrand — see customizations/rebrand-it-dev/README.md
+$CFG_GLPI['app_name'] = 'IT-DEV';
 
 // Languages dictionnary:
 // 0 => regionalized lang code

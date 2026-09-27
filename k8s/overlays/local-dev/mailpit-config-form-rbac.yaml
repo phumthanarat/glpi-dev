@@ -1,0 +1,42 @@
+# Deliberately minimal RBAC for the mailpit-config-form Deployment
+# (see customizations/mailpit-config-form/). This ServiceAccount can:
+#   - get/patch the Secret literally named "mailpit-relay"
+#   - get/patch the Deployment literally named "mailpit"
+# and nothing else — no create verb (the Secret already exists, see
+# mailpit-relay-secret.example.yaml's imperative create command), no
+# wildcard resource names, no access to any other namespace or
+# resource type.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mailpit-config-form
+  namespace: glpi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mailpit-config-form
+  namespace: glpi
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["mailpit-relay"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["mailpit"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mailpit-config-form
+  namespace: glpi
+subjects:
+  - kind: ServiceAccount
+    name: mailpit-config-form
+    namespace: glpi
+roleRef:
+  kind: Role
+  name: mailpit-config-form
+  apiGroup: rbac.authorization.k8s.io

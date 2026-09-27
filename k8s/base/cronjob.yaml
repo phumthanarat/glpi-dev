@@ -1,0 +1,54 @@
+# Runs GLPI's own cron entrypoint (`front/cron.php`, explicitly built
+# for crontab use — there is no `bin/console` cron command in GLPI 11)
+# every 2 minutes. Without this, nothing GLPI schedules internally
+# actually fires on time: SLA/OLA escalation levels (slaticket/
+# olaticket crontasks, 5-minute frequency), the "recall" notification
+# emails those levels trigger, ticket auto-close, satisfaction surveys,
+# etc. all silently never run.
+#
+# Mounts the same glpi-data PVC (config/files/marketplace/plugins) as
+# glpi-app so it reads the same config_db.php — no separate DB secret
+# handling needed beyond what's already on that shared volume.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: glpi-cron
+  namespace: glpi
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # 110 s: room for a full mailgate run (100 e-mails ~60 s, setup-19) plus the other tasks,
+      # still under the 2-minute schedule so runs never overlap
+      activeDeadlineSeconds: 110
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 33
+          containers:
+            - name: glpi-cron
+              image: glpi:11.0
+              imagePullPolicy: IfNotPresent
+              command: ["php", "front/cron.php"]
+              workingDir: /var/www/glpi
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              volumeMounts:
+                - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
+                - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
+                - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
+                - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+          volumes:
+            - name: glpi-data
+              persistentVolumeClaim:
+                claimName: glpi-data

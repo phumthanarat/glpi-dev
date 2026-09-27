@@ -1,0 +1,23 @@
+# NOT included in kustomization.yaml by default - the user asked to
+# close this exposure ("ปิด mailpit-config-form nodeport ก่อนก็ได้",
+# 2026-09-16) after using the form once, since it has no auth in front
+# of it. The app + its ClusterIP Service (mailpit-config-form-service.yaml)
+# keep running; this just isn't exposed to the host.
+#
+# Re-enable with:
+#   kubectl apply -f k8s/overlays/local-dev/mailpit-config-form-nodeport.yaml
+# then reachable at http://localhost:30826/. Disable again with:
+#   kubectl delete service mailpit-config-form-nodeport -n glpi
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit-config-form-nodeport
+  namespace: glpi
+spec:
+  selector:
+    app: mailpit-config-form
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30826
+  type: NodePort

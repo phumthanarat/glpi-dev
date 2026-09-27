@@ -1,0 +1,18 @@
+/* ITDEV-FOOTER-START */
+/*
+ * Replaces the visible "GLPI Copyright (C) ..." footer link text with
+ * "IT-DEV" branding, CSS-only (the <a class="copyright"> element holds
+ * nothing but that text, so hiding the real text and generating a
+ * replacement via ::after is safe here — see rebrand-it-dev/README.md
+ * for the two spots that couldn't be done this way).
+ */
+a.copyright {
+    font-size: 0 !important;
+    line-height: 0 !important;
+}
+a.copyright::after {
+    content: "IT-DEV Copyright (C) 2015-2026 Teclib' and contributors";
+    font-size: 0.875rem;
+    line-height: normal;
+}
+/* ITDEV-FOOTER-END */

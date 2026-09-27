@@ -1,0 +1,17 @@
+# ReadWriteMany because the 3 app pods can now land on any of the 3
+# workers — unlike the local-dev hostPath PVC, this must be readable and
+# writable from every node at once. Longhorn provisions this as a normal
+# replicated volume and fronts it with an internal NFS ShareManager
+# automatically once it sees ReadWriteMany requested.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glpi-data
+  namespace: glpi
+spec:
+  storageClassName: longhorn-glpi
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi

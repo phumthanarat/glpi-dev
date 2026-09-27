@@ -1,0 +1,16 @@
+# Shared writable state for every glpi-app replica: config/ (config_db.php +
+# security key), files/ (uploads, sessions, cache), marketplace/, plugins/.
+# ReadWriteOnce + the "hostpath" storage class only works because this
+# cluster has a single node — see the design doc for what a real multi-node
+# rollout needs instead (NFS/EFS/Longhorn, RWX).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: glpi-data
+  namespace: glpi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

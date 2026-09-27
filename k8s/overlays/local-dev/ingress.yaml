@@ -1,0 +1,31 @@
+# Requires the Kong Ingress Controller installed on this cluster:
+#
+#   helm repo add kong https://charts.konghq.com
+#   helm install kong kong/kong --namespace kong --create-namespace \
+#     --set ingressController.enabled=true \
+#     --set proxy.type=LoadBalancer
+#
+# Docker Desktop's Kubernetes exposes LoadBalancer services on the host's
+# localhost automatically, so mapping dev.glpi.labs to 127.0.0.1 in
+# /etc/hosts is enough to reach GLPI at http://dev.glpi.labs/ — no port
+# needed.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: glpi-app
+  namespace: glpi
+  annotations:
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: dev.glpi.labs
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: glpi-app
+                port:
+                  number: 8080

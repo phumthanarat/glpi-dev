@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: greenmail
+  namespace: glpi
+spec:
+  selector:
+    app: greenmail
+  ports:
+    - name: smtp
+      port: 3025
+      targetPort: 3025
+    - name: imap
+      port: 3143
+      targetPort: 3143
+  type: ClusterIP

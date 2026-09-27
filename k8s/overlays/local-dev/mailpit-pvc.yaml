@@ -1,0 +1,15 @@
+# Local-dev-only persistent inbox for mailpit (see mailpit-deployment.yaml).
+# hostPath PVC, same reasoning as glpi-data/mariadb-data: fine because this
+# cluster has one node. Without this, mailpit's SQLite DB lives in /tmp
+# inside the container and every pod restart wipes the captured inbox.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mailpit-data
+  namespace: glpi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

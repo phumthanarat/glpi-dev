@@ -1,0 +1,36 @@
+diff --git a/src/Auth.php b/src/Auth.php
+index df657f10ae..bb3b14dfe3 100644
+--- a/src/Auth.php
++++ b/src/Auth.php
+@@ -1287,7 +1287,7 @@ class Auth extends CommonGLPI
+             self::CAS => __('CAS'),
+             self::X509 => __('x509 certificate authentication'),
+             self::EXTERNAL => __('Other'),
+-            self::DB_GLPI => __('GLPI internal database'),
++            self::DB_GLPI => __('IT-DEV internal database'),
+             self::API => __('API'),
+             default => '',
+         };
+@@ -1688,7 +1688,7 @@ class Auth extends CommonGLPI
+ 
+         $elements = [
+             '_default'  => 'local',
+-            'local'     => __("GLPI internal database"),
++            'local'     => __("IT-DEV internal database"),
+         ];
+ 
+         // Get LDAP
+diff --git a/src/autoload/CFG_GLPI.php b/src/autoload/CFG_GLPI.php
+index a754b91909..532b3b3228 100644
+--- a/src/autoload/CFG_GLPI.php
++++ b/src/autoload/CFG_GLPI.php
+@@ -44,7 +44,8 @@ global $CFG_GLPI;
+ $CFG_GLPI = [];
+ 
+ // set the default app_name
+-$CFG_GLPI['app_name'] = 'GLPI';
++// IT-DEV rebrand — see customizations/rebrand-it-dev/README.md
++$CFG_GLPI['app_name'] = 'IT-DEV';
+ 
+ // Languages dictionnary:
+ // 0 => regionalized lang code

@@ -1,0 +1,23 @@
+/* ITDEV-WATERMARK-START */
+/*
+ * "IT-DEV" watermark: one large, faint, centered mark fixed in the
+ * viewport on every page (not tiled) — signals this is the dev
+ * environment, not prod. Applied via the same Entity > Custom CSS
+ * mechanism as logo/ and topbar-modern/ — no core files touched.
+ */
+body::before {
+    content: "IT-DEV";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-20deg);
+    font-family: "Arial Black", Arial, sans-serif;
+    font-weight: 900;
+    font-size: 11vw;
+    color: rgba(124, 135, 148, 0.09);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2147483647;
+}
+/* ITDEV-WATERMARK-END */

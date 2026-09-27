@@ -1,0 +1,70 @@
+# Runs the daily-summary script once a day (18:00 Asia/Bangkok, end of
+# business day per the "IT Support Business Hours" calendar from
+# setup-01). Pushes a ticket/change rollup to LINE/Slack/Discord — see
+# customizations/daily-summary/send-daily-summary.php for how to fill
+# in a real token.
+#
+# The image never contains customizations/ (everything there is
+# kubectl-cp'd in manually — see customizations/README.md). A CronJob
+# gets a brand-new pod on every run though, so unlike a one-off manual
+# test this needs the script to persist somewhere every scheduled run
+# can see. Reuses the already-mounted glpi-data PVC (`files` subPath,
+# same volume config_db.php lives on) instead of a separate ConfigMap —
+# kustomize's security policy blocks referencing files outside k8s/
+# from a configMapGenerator, and this reuses what's already wired up
+# instead of fighting that.
+#
+# Deploy/update the script onto that PVC:
+#   POD=$(kubectl -n glpi get pods -l app=glpi-app -o jsonpath='{.items[0].metadata.name}')
+#   kubectl -n glpi exec "$POD" -c glpi-app -- mkdir -p files/_customizations/daily-summary
+#   kubectl -n glpi cp customizations/daily-summary/send-daily-summary.php \
+#     "$POD":/var/www/glpi/files/_customizations/daily-summary/send-daily-summary.php -c glpi-app
+#
+# Starts **suspended**: the script itself has no channel enabled yet
+# (all placeholders in $CHANNELS), so this would just run harmlessly
+# and print to its own pod logs — suspended is just the more honest
+# signal of "not live yet". Un-suspend once a real token is set:
+#   kubectl -n glpi patch cronjob daily-summary --type merge -p '{"spec":{"suspend":false}}'
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-summary
+  namespace: glpi
+spec:
+  schedule: "0 18 * * *"
+  timeZone: "Asia/Bangkok"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 33
+          containers:
+            - name: daily-summary
+              image: glpi:11.0
+              imagePullPolicy: IfNotPresent
+              command: ["php", "files/_customizations/daily-summary/send-daily-summary.php"]
+              workingDir: /var/www/glpi
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              volumeMounts:
+                - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
+                - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
+                - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
+                - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+          volumes:
+            - name: glpi-data
+              persistentVolumeClaim:
+                claimName: glpi-data

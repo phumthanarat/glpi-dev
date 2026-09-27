@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: glpi
+
+resources:
+  - ../../base
+  - pvc.yaml
+  - service-nodeport.yaml
+  - mariadb-pvc.yaml
+  - mariadb-deployment.yaml
+  - mariadb-service.yaml
+  - ingress.yaml
+  - mailpit-deployment.yaml
+  - mailpit-service.yaml
+  - mailpit-pvc.yaml
+  - mailpit-config-form-rbac.yaml
+  - mailpit-config-form-deployment.yaml
+  - mailpit-config-form-service.yaml
+  - greenmail-deployment.yaml
+  - greenmail-service.yaml
+
+# This is what's actually running on the single-node Docker Desktop
+# cluster right now: hostPath PVC (works because there's one node) +
+# NodePort (kept as a fallback path) + an in-cluster mariadb standing in
+# for the "external" database (see mariadb-deployment.yaml and
+# mariadb-secret.example.yaml) + a Kong Ingress (see ingress.yaml —
+# requires Kong installed on this cluster first, same as production).
+#
+# Apply with:
+#   kubectl apply -k k8s/overlays/local-dev

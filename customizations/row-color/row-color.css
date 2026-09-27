@@ -1,0 +1,84 @@
+/* ITDEV-ROWCOLOR-START */
+/* Whole-row tinting for the Ticket search list, based on GLPI's own
+ * badge colors already rendered in the Priority (search option id 3)
+ * and Time to Resolve (id 18) columns - verified directly against
+ * the rendered HTML rather than guessed:
+ *   - Priority badge border-colors come from Setup > General >
+ *     "Priority colors" (glpi_configs priority_1..6, loaded into
+ *     session as glpipriority_1..6). Originally GLPI's stock values
+ *     were all the same red hue at different opacities (hard to tell
+ *     apart) - replaced 2026-09-16 (see
+ *     customizations/priority-colors/set-priority-colors.php) with a
+ *     proper red->green severity scale, distinct hues (High/Medium
+ *     adjusted again 2026-09-16 - the first amber/yellow pair was
+ *     still too close to tell apart):
+ *       #22c55e Very Low   #d97706 High
+ *       #84cc16 Low        #f97316 Very High
+ *       #ca8a04 Medium     #dc2626 Major
+ *     These selectors must stay in sync with the live
+ *     glpi_configs.priority_1..6 values (set via
+ *     customizations/priority-colors/set-priority-colors.php, then
+ *     patched directly for priority_3/priority_4 - see that script's
+ *     comment for the full history).
+ *   - The overdue badge (unsolved ticket past its Time to Resolve
+ *     deadline) always renders with border-color #cf9b9b - this is
+ *     hardcoded in GLPI's Glpi\Search\Provider\SQLProvider, not a
+ *     configurable color, so no session variable to track here.
+ * Closed tickets get a neutral gray instead of a priority/urgency
+ * color - once closed, urgency no longer matters, and gray matches
+ * GLPI's own status icon color scheme (css/includes/components/
+ * itilobject/_status.scss maps both "closed" and "solved" to black/
+ * neutral, unlike the colored "new"/"waiting"/etc states). Matched via
+ * the status icon's own CSS class (.itilstatus.closed on search
+ * option id 12), not a style-string guess.
+ *
+ * Order matters (equal specificity, later rule wins): priority tints
+ * first, overdue next (wins over priority), closed last (wins over
+ * both - a closed ticket doesn't need an urgency color anymore).
+ *
+ * Made deliberately bold ("โดดเด่น" per the user, 2026-09-16, after
+ * the first subtle-tint pass wasn't eye-catching enough): a solid
+ * 4px left border in the row's actual color, stronger background
+ * opacity, and bolder text on the row's own cells.
+ *
+ * Needs :has() (Chrome/Edge 105+, Safari 15.4+, Firefox 121+) - if a
+ * browser doesn't support it, rows just render untinted, falling back
+ * to GLPI's existing per-cell badges (no breakage, graceful).
+ */
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#dc2626"]) {
+    background-color: rgba(220, 38, 38, 0.20) !important;
+    border-left: 4px solid #dc2626 !important;
+    font-weight: 600;
+}
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#f97316"]) {
+    background-color: rgba(249, 115, 22, 0.18) !important;
+    border-left: 4px solid #f97316 !important;
+}
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#d97706"]) {
+    background-color: rgba(217, 119, 6, 0.16) !important;
+    border-left: 4px solid #d97706 !important;
+}
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#ca8a04"]) {
+    background-color: rgba(202, 138, 4, 0.16) !important;
+    border-left: 4px solid #ca8a04 !important;
+}
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#84cc16"]) {
+    background-color: rgba(132, 204, 22, 0.16) !important;
+    border-left: 4px solid #84cc16 !important;
+}
+.search-results tr:has(td[data-searchopt-content-id="3"] .badge_block[style*="#22c55e"]) {
+    background-color: rgba(34, 197, 94, 0.16) !important;
+    border-left: 4px solid #22c55e !important;
+}
+.search-results tr:has(td[data-searchopt-content-id="18"] .badge_block[style*="cf9b9b"]) {
+    background-color: rgba(207, 155, 155, 0.45) !important;
+    border-left: 4px solid #cf9b9b !important;
+    font-weight: 700;
+}
+.search-results tr:has(td[data-searchopt-content-id="12"] i.itilstatus.closed) {
+    background-color: rgba(128, 128, 128, 0.20) !important;
+    border-left: 4px solid #888888 !important;
+    font-weight: 400 !important;
+    opacity: 0.75;
+}
+/* ITDEV-ROWCOLOR-END */

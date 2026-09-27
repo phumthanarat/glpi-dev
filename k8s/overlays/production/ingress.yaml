@@ -1,0 +1,28 @@
+# Requires the Kong Ingress Controller installed on the target cluster
+# (see ../../INSTALL-production.md).
+#
+# Replace glpi.example.com with the real hostname before applying.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: glpi-app
+  namespace: glpi
+  annotations:
+    konghq.com/strip-path: "false"
+    # TLS: once cert-manager (or another ACME client) is set up on the
+    # target cluster, add:
+    #   cert-manager.io/cluster-issuer: letsencrypt-prod
+    # and a `tls:` block below pointing at a Secret it creates.
+spec:
+  ingressClassName: kong
+  rules:
+    - host: glpi.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: glpi-app
+                port:
+                  number: 8080

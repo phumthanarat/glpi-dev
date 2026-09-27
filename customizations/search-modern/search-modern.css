@@ -1,0 +1,237 @@
+/* ITDEV-SEARCHMODERN-START */
+/*
+ * Modernizes GLPI's search/list results table (Assistance > Tickets
+ * and every other itemtype's list — the table always carries the
+ * "search-results" class, verified against the rendered HTML rather
+ * than guessed) to feel as polished as the topbar-modern nav and
+ * row-color badges already applied: a card-like rounded container,
+ * a calmer uppercase header, comfortable row padding, pill-shaped
+ * badges, and a non-destructive hover effect.
+ *
+ * The hover effect uses an inset box-shadow overlay instead of
+ * changing background-color, specifically so it layers ON TOP of
+ * row-color.css's priority/overdue/closed row tints instead of
+ * fighting them for specificity.
+ *
+ * Applied via the same Entity > Custom CSS mechanism as every other
+ * customizations/*  block here — no core files touched.
+ */
+
+/* Card-like rounded container around the table.
+ * BUG FIXED 2026-09-16: `overflow: hidden` here disabled the
+ * `.table-responsive-lg` wrapper's normal horizontal scroll, so with
+ * 12+ columns (wider than the viewport) content past the visible
+ * edge - like the date text in "Time to Resolve + Progress" cells -
+ * got clipped and silently invisible instead of scrollable. Split
+ * into overflow-x: auto (keeps horizontal scroll working) and
+ * overflow-y: hidden (still clips for the rounded top/bottom
+ * corners) - verified this was the actual cause via the user's
+ * screenshot showing empty-looking progress cells that the raw
+ * server-rendered HTML proved actually contained the date text. */
+.table-responsive-lg:has(.search-results) {
+    border-radius: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+/* Header: calm, uppercase, clearly separated from rows.
+ * BUG 2026-09-16: GLPI's own CSS makes this header
+ * `position: sticky; top: 44px` (css/includes/pages/_search.scss),
+ * a hardcoded pixel value calibrated for GLPI's own stock layout.
+ * First attempt: reduced this header's padding to stay closer to
+ * GLPI's tiny default (~0.25rem), assuming the padding increase was
+ * the whole story. Confirmed insufficient - ticket #95 (the very
+ * first row) still rendered hidden behind the header even without
+ * scrolling, meaning something beyond just this header's own height
+ * affects that 44px calibration (likely interaction with other
+ * page-level customizations, e.g. topbar-modern.css's taller nav).
+ * Rather than keep chasing GLPI's exact hardcoded offset, sticky
+ * positioning is disabled outright here - trades away "header stays
+ * visible while scrolling" for guaranteed no-more-hidden-rows. */
+.search-results thead th {
+    position: static !important;
+    top: auto !important;
+    background: #f8fafc;
+    color: #475569;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.4rem 0.6rem !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    white-space: nowrap;
+}
+
+.search-results thead th .sort-indicator i {
+    color: #94a3b8;
+}
+
+/* Rows: more breathing room than stock, but kept modest (same
+ * sticky-header-overlap reasoning as thead th above - a very tall row
+ * height changes how much the page needs to scroll before the sticky
+ * header's 44px trigger point lines up with row boundaries). */
+.search-results tbody td {
+    padding: 0.5rem 0.6rem !important;
+    font-size: 0.92rem;
+    vertical-align: middle !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.05) !important;
+}
+
+.search-results tbody tr {
+    transition: box-shadow 0.12s ease;
+    cursor: pointer;
+}
+
+.search-results tbody tr:hover {
+    box-shadow: inset 0 0 0 9999px rgba(15, 23, 42, 0.04);
+}
+
+/* Status/priority/overdue badges: pill shape, bolder label */
+.search-results .badge_block {
+    border-radius: 999px !important;
+    padding: 0.3rem 0.7rem !important;
+    font-weight: 600;
+    font-size: 0.82rem;
+    display: inline-flex !important;
+    align-items: center;
+}
+
+.search-results .badge_block span {
+    border-radius: 50%;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+}
+
+/* Status icon: slightly larger for quick scanning */
+.search-results .itilstatus {
+    font-size: 1.15rem;
+}
+
+/* --- Record navigation header (#navigationheader, src/CommonGLPI.php) ---
+   Shown on every single-item detail page (Ticket/Change/Problem/etc,
+   the "« ‹ [item name] › »  1/20" bar) - global, not itemtype-specific.
+   The user pointed at a large blank gap above this bar (confirmed via
+   its own id="navigationheader" in DevTools) - I could not find the
+   exact source of that spacing in GLPI's SCSS, so this is a best-effort
+   fix: shrinking the breadcrumb bar's own padding (in case it's an
+   empty-but-still-spaced bar) plus a cleaner, more compact restyle of
+   the nav bar itself. Verify against a fresh screenshot before trusting
+   this fully closed the gap. */
+.secondary-bar {
+    min-height: 0 !important;
+    padding-top: 0.3rem !important;
+    padding-bottom: 0.3rem !important;
+}
+
+.navigationheader {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.75rem !important;
+    padding: 0.5rem 0.75rem !important;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.navigationheader-title {
+    font-size: 1.05rem !important;
+    font-weight: 600;
+}
+
+.navigationheader .btn-icon {
+    border-radius: 8px;
+}
+
+/* --- Auto-expand accordion sections only when jumped-to via :target ---
+   REVISED 2026-09-16: the first version force-expanded every section
+   in #itil-data permanently (including "Change" / item-main itself),
+   so the fields panel was always fully open with no need to click.
+   The user later asked to hide Actors/Items/Analysis/Plans/Linked by
+   default again (back to normal collapsed), while keeping the
+   quick-jump links under "All" (src/Ajax.php) working - i.e. clicking
+   a quick-jump link should scroll to AND open that one section, not
+   leave everything permanently open. Solved with the CSS :target
+   pseudo-class: navigating to a link ending in #actors makes
+   #actors match :target, so this rule only force-shows the specific
+   section the user just jumped to - click-to-toggle on the other
+   accordion headers still works completely normally otherwise.
+   "Change" / item-main is intentionally NOT included here - it stays
+   on GLPI's own default (usually shown), since only the 5 quick-jump
+   sections were asked to go back to collapsed-by-default. */
+#actors:target,
+#items:target,
+#analysis:target,
+#plans:target,
+#linked_itilobjects:target {
+    display: block !important;
+    height: auto !important;
+    visibility: visible !important;
+    animation: itdev-jump-highlight 1.6s ease-out;
+}
+
+/* Modern "scroll-to-highlight" touch: a soft glow that fades out on
+   whichever section the quick-jump link just opened, so it's obvious
+   where you landed instead of just having content silently appear. */
+@keyframes itdev-jump-highlight {
+    0% {
+        background-color: rgba(37, 99, 235, 0.12);
+        box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25) inset;
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: 0 0 0 1px transparent inset;
+    }
+}
+
+/* --- Swap fields panel (Actors/Items/Analysis/Plans/...) to the left ---
+   Found the real shared container: templates/components/itilobject/
+   layout.html.twig wraps both halves in one `.row.itil-object` flex
+   row - `.itil-left-side` (timeline) and `.itil-right-side` (fields
+   panel, #itil-data) are direct siblings, not the unrelated far-apart
+   elements I first assumed. GLPI itself already reorders them per
+   breakpoint via Bootstrap `order-*` utility classes (order-last
+   order-lg-first on the timeline side) - this just overrides those
+   with explicit !important values so the fields panel always comes
+   first (visually left) instead, on any breakpoint. CSS-only, no
+   core template edit needed. */
+.itil-object .itil-left-side {
+    order: 2 !important;
+}
+.itil-object .itil-right-side {
+    order: 1 !important;
+}
+
+/* --- Quick-jump nav items, genuinely inside #tabspanel's <ul> (src/Ajax.php) ---
+   2nd attempt 2026-09-16: the 1st attempt inserted a sibling <div>
+   right after </ul>, but the outer .card-tabs wrapper is flex-row, so
+   that div rendered as its own column BESIDE the tab list instead of
+   stacking under it (confirmed via the user's screenshot - a
+   separate boxed panel to the right of the real tabs, not under
+   them). Fixed by moving these into actual <li class="nav-item"> /
+   <a class="nav-link"> elements INSIDE the <ul> itself, matching the
+   real tabs' own markup exactly - the <ul> is flex-column on md+, so
+   they now stack correctly under "All". Inheriting GLPI's own
+   .nav-item/.nav-link styling means they already look consistent;
+   this CSS only adds a separator so they read as distinct from the
+   real AJAX tabs above them (which they are not - same-page anchor
+   links to fields_panel.html.twig section IDs, not real tabs). */
+.itdev-quickjump-nav:first-of-type {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed rgba(15, 23, 42, 0.12);
+}
+
+.itdev-quickjump-nav .nav-link {
+    color: #64748b !important;
+}
+
+.itdev-quickjump-nav .nav-link:hover {
+    color: #1e293b !important;
+}
+
+.itdev-quickjump-nav .nav-link i {
+    opacity: 0.75;
+}
+/* ITDEV-SEARCHMODERN-END */

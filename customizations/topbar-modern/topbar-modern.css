@@ -1,0 +1,254 @@
+/* ITDEV-TOPBAR-START */
+/*
+ * Modern minimal-flat overlay for the top navbar and user/profile menu.
+ * Applied via GLPI's built-in Entity > "Custom CSS" setting (root entity),
+ * so it survives core updates untouched — no template/core files modified.
+ *
+ * Scope: horizontal top navbar (.topbar) + user menu dropdown (.user-menu).
+ * Style: flat surfaces, no heavy shadows, larger icons, rounded pill/soft
+ * corners, smooth hover transitions.
+ *
+ * Written 2026-09-14 but never actually applied until the system-wide
+ * page_layout switched from "vertical" (left sidebar) to "horizontal"
+ * (this top nav) — see the sibling page_layout config change. Now it's
+ * the primary navigation for every user, so this styling matters.
+ */
+
+/* --- Top navbar: flatten + breathing room --- */
+.topbar.navbar {
+    box-shadow: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Equal-width sectors ("Administration" is 14 chars, "Setup" is 5 -
+   without this, item width is purely content-driven and looks
+   uneven). A fixed `width` (not `min-width` - that only floors the
+   short labels, it doesn't cap the long ones, verified by estimating
+   each label's natural width before picking this number) sized to
+   fit "Administration" (the longest label) is what actually makes
+   every item the same size. white-space:nowrap stops that fixed
+   width from wrapping any label onto two lines. Kept as a fixed
+   width on each item rather than flex:1 on the row so the group
+   stays a compact, centered block instead of stretching edge to edge
+   across the whole topbar. */
+.topbar #navbar-menu .nav-item .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    width: 240px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    padding: 0.9rem 1.1rem !important;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    text-align: center;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.topbar #navbar-menu .nav-item .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.topbar #navbar-menu .nav-item.active .nav-link {
+    background-color: rgba(255, 255, 255, 0.14);
+    opacity: 1 !important;
+}
+
+/* Bigger icons across the top navbar */
+.topbar .nav-item i,
+.topbar .nav-link i {
+    font-size: 1.75rem;
+    margin-right: 0.45em;
+}
+
+/* --- "Find menu" (fuzzy search trigger, layout/parts/goto_button.html.twig) ---
+   A completely different element (.trigger-fuzzy, a plain btn-ghost-secondary)
+   from the 6 sector .nav-links above, so none of that styling reached it -
+   give it a matching pill treatment so it doesn't look like an afterthought
+   next to the modernized sectors. The shortcut badge reads the button's own
+   `title` attribute via attr() instead of hardcoding "Ctrl+Alt+G" - the
+   template already computes the correct one per platform (Mac gets
+   "Option+Command+G"), so this stays correct without duplicating that logic. */
+.topbar .trigger-fuzzy {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem !important;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.05);
+    font-weight: 500;
+    font-size: 0.95rem;
+    opacity: 1 !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.topbar .trigger-fuzzy:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.32);
+}
+
+.topbar .trigger-fuzzy i {
+    font-size: 1.15rem;
+    margin-right: 0;
+}
+
+.topbar .trigger-fuzzy::after {
+    content: attr(title);
+    margin-left: 0.3rem;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.14);
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
+/* --- User/profile menu trigger --- */
+.user-menu .user-menu-dropdown-toggle {
+    padding: 0.4rem 0.75rem !important;
+    border-radius: 999px;
+    transition: background-color 0.15s ease;
+}
+
+.user-menu .user-menu-dropdown-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.user-menu .user-menu-dropdown-toggle img,
+.user-menu .user-menu-dropdown-toggle .avatar {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+}
+
+/* --- User/profile dropdown menu: flat card, bigger icons --- */
+.user-menu .dropdown-menu {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    padding: 0.5rem;
+    min-width: 260px;
+}
+
+.user-menu .dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.user-menu .dropdown-menu .dropdown-item i {
+    font-size: 1.25rem;
+    width: 1.4em;
+    text-align: center;
+}
+
+.user-menu .dropdown-menu .dropdown-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.user-menu .dropdown-header {
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+}
+
+.user-menu .dropdown-divider {
+    margin: 0.4rem 0;
+}
+
+/* --- Main sector dropdowns (Assets, Assistance, Management, ...) ---
+   These are the primary navigation now that page_layout is horizontal
+   instead of the vertical sidebar — worth the same flat-card treatment
+   as the user menu got above. */
+.topbar .navbar-nav .dropdown-menu {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    border-radius: 12px;
+    padding: 0.6rem;
+    margin-top: 0.4rem !important;
+}
+
+.topbar .navbar-nav .dropdown-menu .dropdown-header {
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+    padding: 0.4rem 0.75rem;
+}
+
+.topbar .navbar-nav .dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    font-size: 1.02rem;
+    transition: background-color 0.12s ease;
+}
+
+.topbar .navbar-nav .dropdown-menu .dropdown-item i {
+    font-size: 1.3rem;
+    width: 1.3em;
+    text-align: center;
+    opacity: 0.75;
+}
+
+.topbar .navbar-nav .dropdown-menu .dropdown-item:hover,
+.topbar .navbar-nav .dropdown-menu .dropdown-item.active {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* --- Per-sector accent colors ---
+   Added 2026-09-16 ("ทำให้ user อยากใช้งาน" - make it inviting):
+   each top-level sector gets its own identity color, matched via its
+   actual icon class (verified against src/Html.php::getMenuInfos(),
+   not guessed) rather than nth-child position, so it's unaffected by
+   plugins adding/removing a "Plugins" tab between them.
+   Needs :has() and color-mix() (Chrome/Edge 111+, Safari 16.4+,
+   Firefox 113+) - falls back to the plain flat styling above on older
+   browsers, no breakage. */
+.topbar .nav-item:has(> .nav-link .ti-package)      { --sector-color: #2563eb; } /* Assets */
+.topbar .nav-item:has(> .nav-link .ti-headset)      { --sector-color: #0d9488; } /* Assistance */
+.topbar .nav-item:has(> .nav-link .ti-wallet)       { --sector-color: #7c3aed; } /* Management */
+.topbar .nav-item:has(> .nav-link .ti-briefcase)    { --sector-color: #d97706; } /* Tools */
+.topbar .nav-item:has(> .nav-link .ti-shield-check) { --sector-color: #dc2626; } /* Administration */
+.topbar .nav-item:has(> .nav-link .ti-settings)     { --sector-color: #64748b; } /* Setup */
+
+.topbar .nav-item .nav-link i {
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.topbar .nav-item:hover .nav-link {
+    transform: translateY(-1px);
+}
+
+.topbar .nav-item:hover .nav-link i,
+.topbar .nav-item.active .nav-link i {
+    color: var(--sector-color, currentColor);
+}
+
+.topbar .nav-item.active .nav-link {
+    box-shadow: inset 0 -3px 0 0 var(--sector-color, transparent);
+    background-color: color-mix(in srgb, var(--sector-color, white) 16%, transparent) !important;
+}
+
+.topbar .nav-item .dropdown-menu .dropdown-header {
+    color: var(--sector-color, inherit);
+    opacity: 1 !important;
+}
+
+.topbar .nav-item .dropdown-menu .dropdown-item:hover {
+    background-color: color-mix(in srgb, var(--sector-color, black) 8%, transparent) !important;
+}
+
+.topbar .nav-item .dropdown-menu .dropdown-item i {
+    color: var(--sector-color, inherit);
+    opacity: 0.85;
+}
+/* ITDEV-TOPBAR-END */

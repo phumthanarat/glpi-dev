@@ -1,0 +1,41 @@
+# Small internal form for setting mailpit's SMTP relay credentials
+# without a terminal (see customizations/mailpit-config-form/ for the
+# app, mailpit-config-form-rbac.yaml for its scoped permissions).
+#
+# Built locally and run via the docker-desktop context, which shares
+# its image cache directly with this cluster's kubelet — no registry
+# push needed, hence imagePullPolicy: Never. Rebuild+reapply after any
+# change to customizations/mailpit-config-form/:
+#   docker build -t mailpit-config-form:local customizations/mailpit-config-form
+#   kubectl rollout restart deployment/mailpit-config-form -n glpi
+#
+# No auth in front of this (see app.py's docstring) — fine for this
+# single-developer local-dev cluster, not for anything shared.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit-config-form
+  namespace: glpi
+  labels:
+    app: mailpit-config-form
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit-config-form
+  template:
+    metadata:
+      labels:
+        app: mailpit-config-form
+    spec:
+      serviceAccountName: mailpit-config-form
+      containers:
+        - name: mailpit-config-form
+          image: mailpit-config-form:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 2
+            periodSeconds: 5

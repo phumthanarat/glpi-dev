@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glpi-app
+  namespace: glpi
+  labels:
+    app: glpi-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: glpi-app
+  template:
+    metadata:
+      labels:
+        app: glpi-app
+    spec:
+      securityContext:
+        # PVC-backed subPaths are created root-owned by default; this makes
+        # them group-writable by www-data (uid/gid 33 in the image) so the
+        # init container (and app) can write config_db.php, sessions, etc.
+        fsGroup: 33
+
+      # Runs once per pod (harmless if it runs again on every restart):
+      # writes config/config_db.php on the shared PVC if it isn't there
+      # yet, so every replica points at the same external database without
+      # baking connection details into the image.
+      initContainers:
+        - name: configure-db
+          image: glpi:11.0
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              if [ ! -f /var/www/glpi/config/config_db.php ]; then
+                echo "config_db.php missing — running database:configure"
+                php bin/console database:configure \
+                  --db-host="$DB_HOST" \
+                  --db-port="$DB_PORT" \
+                  --db-name="$DB_NAME" \
+                  --db-user="$DB_USER" \
+                  --db-password="$DB_PASSWORD" \
+                  --no-interaction
+              else
+                echo "config_db.php already present — skipping"
+              fi
+          env:
+            - name: DB_HOST
+              valueFrom: { secretKeyRef: { name: db-external, key: host } }
+            - name: DB_PORT
+              valueFrom: { secretKeyRef: { name: db-external, key: port } }
+            - name: DB_NAME
+              valueFrom: { secretKeyRef: { name: db-external, key: database } }
+            - name: DB_USER
+              valueFrom: { secretKeyRef: { name: db-external, key: user } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: db-external, key: password } }
+          volumeMounts:
+            - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
+            - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
+            - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
+            - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+
+      containers:
+        - name: glpi-app
+          image: glpi:11.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet: { path: /, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
+            - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }
+            - { name: glpi-data, mountPath: /var/www/glpi/marketplace, subPath: marketplace }
+            - { name: glpi-data, mountPath: /var/www/glpi/plugins, subPath: plugins }
+
+      volumes:
+        - name: glpi-data
+          persistentVolumeClaim:
+            claimName: glpi-data

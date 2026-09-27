@@ -1,0 +1,68 @@
+# Production-oriented stack for the image built from ./Dockerfile.
+#
+# The repo already ships docker-compose.yaml for local development/CI
+# (dev container, cypress, ldap, mailpit, ...) — this file is a separate,
+# minimal stack meant for running GLPI in production:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# TLS/reverse proxying is expected to be handled in front of this stack
+# (load balancer, Traefik, nginx, ...) and is intentionally out of scope.
+
+services:
+  app:
+    build:
+      context: .
+    image: glpi:11.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - glpi_files:/var/www/glpi/files
+      - glpi_config:/var/www/glpi/config
+      - glpi_marketplace:/var/www/glpi/marketplace
+      - glpi_plugins:/var/www/glpi/plugins
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/", "-o", "/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+      MARIADB_DATABASE: glpi
+      MARIADB_USER: glpi
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    ports:
+      # Published to the host so the Kubernetes deployment (a separate
+      # cluster) can reach this database as its "external database" stand-in
+      # via host.docker.internal. Remove once pointed at a real external DB.
+      - "3306:3306"
+    volumes:
+      - glpi_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  glpi_db:
+  glpi_files:
+  glpi_config:
+  glpi_marketplace:
+  glpi_plugins:

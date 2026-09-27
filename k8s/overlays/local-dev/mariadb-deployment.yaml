@@ -1,0 +1,62 @@
+# Local-dev-only database, in-cluster. base/ deliberately treats the
+# database as external (see k8s/README.md) — this is the local-dev
+# stand-in for that external database, replacing the previous stand-in
+# (docker-compose's glpi-db-1, reached via host.docker.internal). Point
+# the db-external Secret's host/port at the "mariadb" Service below.
+#
+# Single replica + Recreate strategy: the PVC is ReadWriteOnce, so two
+# mysqld processes must never run against it at once.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: glpi
+  labels:
+    app: mariadb
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: mariadb:11.8
+          # MariaDB 11.6+ defaults innodb_snapshot_isolation=ON, which aborts a transaction that
+          # updates a row another transaction changed after its snapshot (error 1020). GLPI touches
+          # shared rows inside ticket creation (e.g. the Helpdesk form's date_mod), so two users
+          # submitting the same form at once made one of them fail with HTTP 500 and no ticket
+          # (found by customizations/itchat-dev/tests/run.sh load). OFF = the behaviour GLPI was
+          # written for (MariaDB <= 11.5 / MySQL). Set the same on the production database.
+          args: ["--innodb-snapshot-isolation=OFF"]
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - secretRef:
+                name: mariadb-local
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["healthcheck.sh", "--connect", "--innodb_initialized"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command: ["healthcheck.sh", "--connect"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+      volumes:
+        - name: mariadb-data
+          persistentVolumeClaim:
+            claimName: mariadb-data

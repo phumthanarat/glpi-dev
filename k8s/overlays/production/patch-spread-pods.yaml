@@ -1,0 +1,27 @@
+# Spreads the 3-10 replicas across the 3 workers instead of letting the
+# scheduler bin-pack them onto one or two. "preferred", not "required",
+# so the Deployment still schedules if a worker is temporarily down.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glpi-app
+  namespace: glpi
+spec:
+  template:
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: glpi-app
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: glpi-app

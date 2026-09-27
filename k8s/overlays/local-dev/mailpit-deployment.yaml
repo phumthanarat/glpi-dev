@@ -1,0 +1,76 @@
+# Local-dev-only fake SMTP server for testing GLPI's notification
+# emails (escalation alerts, approval requests, ticket lifecycle
+# notifications, ...) without a real mail relay. Same image the repo's
+# docker-compose.yaml dev stack already uses (axllent/mailpit).
+# Captures everything sent to it — nothing leaves the cluster.
+#
+# Optional "Release" (resend) support: mailpit-relay-secret.example.yaml
+# is a template for a `mailpit-relay` Secret carrying MP_SMTP_RELAY_*
+# vars. It's `optional: true` below so mailpit runs today exactly as
+# before with no such Secret present — pending real relay SMTP
+# credentials, see that file and k8s/README.md.
+#
+# --database persists the inbox on mailpit-data (PVC) instead of the
+# container's /tmp, which gets wiped on every pod restart/rollout.
+# --ignore-duplicate-ids dedupes messages sharing a Message-ID.
+# --max-age caps inbox growth on the 1Gi PVC. --label identifies this
+# instance in the web UI (useful once more than one mailpit exists).
+# --smtp-disable-rdns skips a reverse-DNS lookup GLPI's in-cluster IP
+# has no PTR record for anyway.
+#
+# Deliberately NOT enabled here (each needs a decision, not just a
+# flag): --ui-auth-file/--smtp-auth-file (would require also updating
+# GLPI's SMTP config with matching creds — breaks sending until done),
+# --pop3-auth-file (needs a credential to hand out), --webhook-url
+# (needs a real target, same as the pending chat webhooks), and
+# --enable-chaos (deliberately injects SMTP failures — opt-in only).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: glpi
+  labels:
+    app: mailpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      containers:
+        - name: mailpit
+          image: axllent/mailpit
+          args:
+            - --database=/data/mailpit.db
+            - --ignore-duplicate-ids
+            - --max-age=30d
+            - --label=GLPI ITSM (dev)
+            - --smtp-disable-rdns
+          ports:
+            - name: smtp
+              containerPort: 1025
+            - name: http
+              containerPort: 8025
+          envFrom:
+            - secretRef:
+                name: mailpit-relay
+                optional: true
+          volumeMounts:
+            - name: mailpit-data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket: { port: 8025 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 8025 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: mailpit-data
+          persistentVolumeClaim:
+            claimName: mailpit-data

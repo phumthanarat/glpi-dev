@@ -1,0 +1,16 @@
+# NodePort variant for local testing without an Ingress controller.
+# Not part of base since a real cluster fronts the app with Ingress
+# instead (see overlays/production).
+apiVersion: v1
+kind: Service
+metadata:
+  name: glpi-app-nodeport
+  namespace: glpi
+spec:
+  selector:
+    app: glpi-app
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort

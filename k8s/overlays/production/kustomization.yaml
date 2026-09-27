@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: glpi
+
+resources:
+  - ../../base
+  - storageclass-longhorn.yaml
+  - pvc.yaml
+  - ingress.yaml
+
+patches:
+  - path: patch-spread-pods.yaml
+    target:
+      kind: Deployment
+      name: glpi-app
+
+# Prerequisites on the target cluster (not created by this overlay):
+#   1. Longhorn CSI driver installed          — ../../INSTALL-production.md
+#   2. Kong Ingress Controller installed       — ../../INSTALL-production.md
+#   3. A real "db-external" Secret created     — ../../base/secret-db-external.example.yaml
+#
+# Then:
+#   kubectl apply -k k8s/overlays/production

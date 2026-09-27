@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  namespace: glpi
+spec:
+  selector:
+    app: mailpit
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: 1025
+    - name: http
+      port: 8025
+      targetPort: 8025
+  type: ClusterIP
+---
+# Web UI (inbox view) reachable from the host without needing the
+# dev.glpi.labs Ingress — same NodePort pattern as glpi-app-nodeport.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit-nodeport
+  namespace: glpi
+spec:
+  selector:
+    app: mailpit
+  ports:
+    - port: 8025
+      targetPort: 8025
+      nodePort: 30825
+  type: NodePort

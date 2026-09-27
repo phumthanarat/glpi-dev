@@ -1,0 +1,13 @@
+# Local-dev-only stand-in database (see mariadb-deployment.yaml). hostPath
+# PVC, same reasoning as glpi-data: fine because this cluster has one node.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-data
+  namespace: glpi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
