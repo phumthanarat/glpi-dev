@@ -37,4 +37,6 @@ function plugin_init_itbackup(): void
 
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['itbackup'] = true;
     $PLUGIN_HOOKS[Hooks::MENU_TOADD]['itbackup'] = ['config' => [\GlpiPlugin\Itbackup\Menu::class]];
+    // the file share password is stored encrypted with GLPI's key
+    $PLUGIN_HOOKS[Hooks::SECURED_CONFIGS]['itbackup'] = ['smb_pass'];
 }

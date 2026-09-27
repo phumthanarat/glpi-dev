@@ -111,6 +111,8 @@ FROM php:8.3-apache AS app
 # PHP extensions required by GLPI (see composer.json "require").
 # Build deps are installed and purged in the same layer so they never
 # end up in the final image.
+# rclone: IT Backup copies each backup to an off-site destination (Windows
+# file share / SMB...), see customizations/itbackup.
 # ------------------------------------------------------------
 RUN set -eux; \
     apt-get update; \
@@ -123,7 +125,8 @@ RUN set -eux; \
         libbz2-dev \
         libldap-dev \
         libonig-dev \
-        default-mysql-client; \
+        default-mysql-client \
+        rclone; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
     docker-php-ext-configure ldap; \
     docker-php-ext-install -j"$(nproc)" \

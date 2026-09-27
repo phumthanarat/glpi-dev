@@ -104,10 +104,7 @@ class Backup
         if (!self::available()) {
             throw new RuntimeException('backup volume ' . self::BACKUP_DIR . ' is missing or not writable');
         }
-        $lock = fopen(self::BACKUP_DIR . '/.lock', 'c');
-        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
-            throw new RuntimeException('another backup is running');
-        }
+        $lock = self::lock();
 
         $start = microtime(true);
         $name  = 'backup-' . date('Ymd-His') . '-' . $type;
@@ -162,6 +159,11 @@ class Backup
             }
             self::writeStatus(['name' => $name] + $manifest);
             $manifest['pruned'] = self::prune();
+            // off-site copy (Windows file share): a failure there doesn't undo the local backup,
+            // it is reported (page + exit code of bin/backup.php) and retried on the next run
+            if (Remote::enabled()) {
+                $manifest['remote_sync'] = Remote::sync();
+            }
             return ['name' => $name] + $manifest;
         } catch (\Throwable $e) {
             self::rmTree($tmp);
@@ -171,6 +173,16 @@ class Backup
             flock($lock, LOCK_UN);
             fclose($lock);
         }
+    }
+
+    /** Exclusive lock for a backup / sync run; throws if one is already running. */
+    public static function lock()
+    {
+        $lock = fopen(self::BACKUP_DIR . '/.lock', 'c');
+        if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+            throw new RuntimeException('another backup is running');
+        }
+        return $lock;
     }
 
     /** Deletes backups older than keep_days, never the newest one. Returns the deleted names. */

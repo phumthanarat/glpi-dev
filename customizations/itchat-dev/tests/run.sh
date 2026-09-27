@@ -92,7 +92,7 @@ case "$MODE" in
     smoke)    run "flow x3" py test_flow.py 3; run security py test_security.py; run features py test_features.py; run collab py test_collab.py ;;
     # email first: flow x30 queues hundreds of notification e-mails, and the e-mail test waits
     # for GLPI's confirmation e-mail, which would sit behind that backlog
-    full)     run email py test_email.py; run "flow x30" py test_flow.py 30; run security py test_security.py; run features py test_features.py; run collab py test_collab.py; run tickets py test_tickets.py; run helpdesk py test_helpdesk.py; run central py test_central.py; run qr py test_qr.py; run backup py test_backup.py; run ui ui ;;
+    full)     run email py test_email.py; run "flow x30" py test_flow.py 30; run security py test_security.py; run features py test_features.py; run collab py test_collab.py; run tickets py test_tickets.py; run helpdesk py test_helpdesk.py; run central py test_central.py; run qr py test_qr.py; run backup py test_backup.py; run backup-remote py test_backup_remote.py; run ui ui ;;
     features) run features py test_features.py ;;
     collab)   run collab py test_collab.py ;;
     tickets)  run tickets py test_tickets.py ;;
@@ -100,7 +100,8 @@ case "$MODE" in
     central)  run central py test_central.py ;;
     email)    run email py test_email.py ;;
     qr)       run qr py test_qr.py ;;
-    backup)   run backup py test_backup.py ;;
+    backup)   run backup py test_backup.py; run backup-remote py test_backup_remote.py ;;
+    backup-remote) run backup-remote py test_backup_remote.py ;;
     load)     run load py test_load.py ;;
     flow)     run "flow x${2:-3}" py test_flow.py "${2:-3}" ;;
     security) run security py test_security.py ;;

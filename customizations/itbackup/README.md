@@ -29,6 +29,19 @@ kubectl rollout restart deploy/glpi-app -n glpi
 ```
 Always restore the database and `files.tar.gz` of the **same** backup (the key must match).
 
+## Copy to a Windows file share (off-site)
+On the page, **ปลายทางสำรอง: Windows file share**: file server, share, folder, domain, user,
+password (stored encrypted with GLPI's key, never shown again; empty field = keep it), switch
+"copy every backup here", **บันทึก + ทดสอบการเชื่อมต่อ** (writes, reads back and deletes a test file).
+
+After every backup, each local backup not copied yet is copied with rclone (SMB), checked
+(same files, same sizes on the share) and marked in its manifest; the share is pruned with the
+same retention. A share that's down doesn't fail the local backup: the page turns red, the
+CronJob exits 2, and the next run (or **copy ที่ค้างตอนนี้**) catches up.
+Use an account that can only write to that folder.
+
+Needs rclone in the image (Dockerfile installs it): rebuild the image after pulling this.
+
 ## Keep a copy elsewhere
 The volume is on the cluster: a lost cluster / disk loses the backups too. Copy them off
 regularly, e.g. `kubectl cp glpi/<pod>:/var/lib/glpi-backups ./glpi-backups -c glpi-app`,
@@ -36,6 +49,7 @@ or to a NAS / S3 bucket. Backups contain every password and document of GLPI: st
 encrypted, with restricted access.
 
 ## Deploy / test
-`customizations/itbackup-dev/deploy.sh` (install.sh does it), `tests/run.sh backup` (33 checks:
-rights, Backup now, sha256 / completeness of real backups, downloads + path traversal,
-the CronJob, retention, delete).
+`customizations/itbackup-dev/deploy.sh` (install.sh does it). `tests/run.sh backup`: 33 checks
+(rights, Backup now, sha256 / completeness of real backups, downloads + path traversal, the
+CronJob, retention, delete) + 20 against a real SMB server (Samba pod): connection test, password
+encrypted and never shown, sha256 on the share, share down then back, retention on the share.
