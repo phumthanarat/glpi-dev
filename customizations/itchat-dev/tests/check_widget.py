@@ -1,13 +1,16 @@
 """Post-deploy browser check: the chat widget renders for a requester and a technician,
 with no JavaScript errors. Used by deploy.sh (with automatic asset rollback on failure).
 
-Env: GLPI_URL, CHECK_USERS = "login:password,login:password" (default post-only + glpi).
+Env: GLPI_URL, CHECK_USERS = "login:password,login:password" (default post-only + glpi; deploy.sh passes
+the fixture accounts), ITCHAT_TEST_CREDS for their 2FA secrets (technicians get GLPI's MFA prompt).
 Exit 0 = ok, 1 = widget missing or JS error.
 """
 import os
 import sys
 
 from playwright.sync_api import sync_playwright
+
+from totp import browser_mfa
 
 BASE = os.environ.get('GLPI_URL', 'http://localhost:30080').rstrip('/')
 USERS = [u.split(':', 1) for u in os.environ.get('CHECK_USERS', 'post-only:postonly,glpi:glpi').split(',')]
@@ -24,6 +27,7 @@ with sync_playwright() as pw:
         page.fill('input[name="login_password"]', password)
         page.press('input[name="login_password"]', 'Enter')
         page.wait_for_load_state('networkidle')
+        browser_mfa(page, login)
         try:
             page.wait_for_selector('.itchat-fab', state='visible', timeout=10000)
             page.click('.itchat-fab')

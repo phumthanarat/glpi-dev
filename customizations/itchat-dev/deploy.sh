@@ -24,7 +24,8 @@
 #   --test     run tests/run.sh smoke against the cluster after deploying
 #   --dry-run  lint + build + report what would change, touch nothing
 #   --no-ui-check  skip step 6b (e.g. no docker)
-# Env for 6b: CHECK_USERS="login:pass,login:pass" (default post-only:postonly,glpi:glpi), GLPI_URL
+# Env for 6b: CHECK_USERS="login:pass,login:pass" (default: the test suite's fixture accounts, a requester
+#             and a technician with a known 2FA secret, made for the check and removed after it), GLPI_URL
 #
 # Env: NS (default glpi), APP_LABEL (default app=glpi-app), CONTAINER (default glpi-app)
 
@@ -67,13 +68,33 @@ for p in json.load(sys.stdin)["items"]:
 }
 kexec() { kubectl -n "$NS" exec "$POD" -c "$CONTAINER" -- "$@"; }
 
+# Accounts for 6b. The real admin can't be scripted (own password, 2FA) and GLPI's default accounts are
+# disabled by setup-21, so unless CHECK_USERS is given, borrow tests/fixtures.php's itchat.test.* accounts.
+FIXTURE_POD=""
+fixture_teardown() {
+    [ -n "$FIXTURE_POD" ] && kubectl -n "$NS" exec "$FIXTURE_POD" -c "$CONTAINER" -- \
+        php /tmp/itchat-tests/fixtures.php teardown >/dev/null 2>&1 || true
+}
+ui_accounts() {
+    [ -n "${CHECK_USERS:-}" ] && return
+    FIXTURE_POD=$(live_pod)
+    kubectl -n "$NS" exec "$FIXTURE_POD" -c "$CONTAINER" -- mkdir -p /tmp/itchat-tests
+    kubectl -n "$NS" cp "$HERE/tests/fixtures.php" "$FIXTURE_POD:/tmp/itchat-tests/fixtures.php" -c "$CONTAINER"
+    ITCHAT_TEST_CREDS=$(kubectl -n "$NS" exec "$FIXTURE_POD" -c "$CONTAINER" -- php /tmp/itchat-tests/fixtures.php setup \
+        | tail -1 | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["users"]))') \
+        || die "could not create the browser-check accounts (tests/fixtures.php setup)"
+    CHECK_USERS=$(printf '%s' "$ITCHAT_TEST_CREDS" | python3 -c 'import json,sys
+c = json.load(sys.stdin); print(",".join(f"{u}:{c[u]}" for u in ("itchat.test.user1", "itchat.test.tech")))')
+    export ITCHAT_TEST_CREDS CHECK_USERS
+}
+
 # tests/check_widget.py in the Playwright image; reaches the NodePort via host.docker.internal
 widget_check() {
     local url=${GLPI_URL:-http://localhost:30080}
     url=${url/localhost/host.docker.internal}
     url=${url/127.0.0.1/host.docker.internal}
     timeout 300 docker run --rm --add-host host.docker.internal:host-gateway \
-        -e GLPI_URL="$url" ${CHECK_USERS:+-e CHECK_USERS="$CHECK_USERS"} \
+        -e GLPI_URL="$url" ${CHECK_USERS:+-e CHECK_USERS="$CHECK_USERS"} ${ITCHAT_TEST_CREDS:+-e ITCHAT_TEST_CREDS="$ITCHAT_TEST_CREDS"} \
         -v "$HERE/tests":/tests:ro -w /tests "${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright/python:v1.55.0-noble}" \
         sh -c 'pip install -q --timeout 20 --retries 2 playwright==1.55.0 >/dev/null 2>&1; python check_widget.py'
 }
@@ -92,7 +113,7 @@ echo "ok"
 # ------------------------------------------------------------------ 2. build
 step "2. build"
 BUILD=$(mktemp -d)
-trap 'rm -rf "$BUILD"' EXIT
+trap 'rm -rf "$BUILD"; fixture_teardown' EXIT
 cp -r "$SRC" "$BUILD/itchat"
 rm -rf "$BUILD/itchat/public/dist"
 mkdir -p "$BUILD/itchat/public/dist"
@@ -188,6 +209,7 @@ if [ "$SKIP_UI_CHECK" = 1 ]; then
     step "6b. browser check skipped (--no-ui-check)"
 else
     step "6b. browser check (widget renders, no JS errors)"
+    ui_accounts
     if ! widget_check; then
         if [ -n "$PREV_MANIFEST" ]; then
             printf '%s\n' "$PREV_MANIFEST" > "$BUILD/prev-manifest.json"

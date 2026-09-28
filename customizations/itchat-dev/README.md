@@ -21,7 +21,7 @@ What it decides for you:
 After every deploy, `deploy.sh` logs in as a requester and a technician in a real (headless) browser (`tests/check_widget.py`) and checks
 that the 💬 widget renders with no JavaScript errors. If it doesn't, `manifest.json` is pointed back at the previous JS/CSS build (instant rollback),
 and the deploy fails. The check was added after 1.6.0 shipped a `chat.js` that parsed fine but threw on load, so no widget appeared.
-Accounts come from `CHECK_USERS="login:pass,login:pass"` (default `post-only:postonly,glpi:glpi`, so **set it once those default passwords are changed**).
+Accounts: the test suite's fixture accounts (`itchat.test.user1` and `itchat.test.tech`, with a known 2FA secret), made for the check and removed after it, since `glpi` has its own password + 2FA and GLPI's default accounts are disabled. `CHECK_USERS="login:pass,login:pass"` uses other accounts instead.
 Use `--no-ui-check` to skip.
 
 So **bump the version only when `hook.php` has something new to install** (tables, columns, automatic actions).
