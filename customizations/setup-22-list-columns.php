@@ -8,9 +8,13 @@
  * progress (time to resolve / to own, and whether it's exceeded), requester, technician and
  * category - the columns that were set up by hand on the first install.
  *
+ * Also turns on auto-refresh of lists / dashboards / kanban (Setup > General > Default values >
+ * "Automatically refresh data"), default every REFRESH_MINUTES=1 minute (0 = off). Users can still
+ * pick their own interval under My settings.
+ *
  * Idempotent: replaces the global (users_id = 0) Central list of these three itemtypes.
  * Run inside the app container:
- *   php customizations/setup-22-list-columns.php
+ *   php customizations/setup-22-list-columns.php [REFRESH_MINUTES=1]
  */
 
 chdir('/var/www/glpi');
@@ -62,4 +66,8 @@ foreach ($columns as $itemtype => $nums) {
     }
     echo "$itemtype list: " . count($nums) . " columns\n";
 }
+$refresh = getenv('REFRESH_MINUTES');
+$refresh = $refresh === false || $refresh === '' ? 1 : max(0, (int) $refresh);
+Config::setConfigurationValues('core', ['refresh_views' => $refresh]);
+echo "Auto-refresh of lists: " . ($refresh ? "every $refresh min" : 'off') . "\n";
 echo "Done. Users who customised their own columns keep them.\n";

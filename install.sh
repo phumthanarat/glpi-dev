@@ -318,7 +318,7 @@ else
     echo "  setup-19-mail-intake.php                         skipped (MAIL_INTAKE_HOST not set)"
 fi
 run setup-20-central-source-phone.php
-run setup-22-list-columns.php
+run setup-22-list-columns.php REFRESH_MINUTES="${REFRESH_MINUTES:-1}"
 run setup-23-https.php TLS_HOSTS="$INGRESS_HOST"
 run setup-24-login-security.php IDLE_TIMEOUT_MINUTES="${IDLE_TIMEOUT_MINUTES:-60}" \
     TFA_PROFILES="${TFA_PROFILES:-Super-Admin,Admin,Supervisor,Technician,Hotliner}" TFA_GRACE_DAYS="${TFA_GRACE_DAYS:-7}"
