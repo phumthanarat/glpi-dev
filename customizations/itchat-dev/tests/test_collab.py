@@ -153,6 +153,38 @@ fixture('ticket-status', tt, 5)  # solved
 c, r = post(tech2, action='transfer', conv=tconv, users_id=me['tech'])
 check('solved ticket stays with its assignee', c == 200 and r.get('ticket_moved') is False
       and inspect_tickets([tt])[tt]['assignees'] == ['itchat.test.tech2'], (r, inspect_tickets([tt])[tt]))
+
+# ---------------------------------------------------------------- default profile of new technicians
+check('technician account gets its profile as default', fixture('default-profile', 'itchat.test.tech')['profile'] == 'Technician')
+check('any central profile does (Observer)', fixture('default-profile', 'itchat.test.observer')['profile'] == 'Observer')
+check('requester default left alone (none = their Self-Service profile)',
+      fixture('default-profile', 'itchat.test.user1')['profile'] in ('', 'Self-Service'))
+
+# ---------------------------------------------------------------- ticket to the chat's tech; impact, device, Change
+for s in (u1, u2):
+    close_open_chat(s)
+pc = fixture('give-computer', 'itchat.test.user2')['computer']
+c, r = post(u2, action='send', conv=0, content=f'{PREFIX} change request: VPN for the new branch')
+cconv = r['conv']
+post(tech, action='claim', conv=cconv)
+post(tech, action='transfer', conv=cconv, users_id=me['tech2'])  # transferred before the ticket exists
+form = get(tech, action='ticketform', conv=cconv).json()
+check('dialog: ticket will go to the chat tech, not me', form['assignee_other'] is True, form.get('assignee'))
+check('dialog offers Change as a type', 'change' in [t['value'] for t in form['types']], form['types'])
+check('dialog offers impacts', 3 in [i['value'] for i in form['impacts']], form['impacts'])
+check("dialog lists the requester's device", f'Computer:{pc}' in [i['value'] for i in form['items']], form['items'])
+check('Change link refused for an Incident', post(tech, action='toticket', conv=cconv, type=1, change=-1)[0] == 400)
+check('unknown device refused', post(tech, action='toticket', conv=cconv, type=2, item='Computer:99999999')[0] == 400)
+check('invalid impact refused', post(tech, action='toticket', conv=cconv, type=2, impact=9)[0] == 400)
+c, r = post(tech, action='toticket', conv=cconv, type='change', urgency=5, impact=5, item=f'Computer:{pc}')
+check('type Change: ticket + new Change', c == 200 and r.get('changes_id') and not r['change_failed'], r)
+ct = r.get('tickets_id')
+t = inspect_tickets([ct])[ct]
+check('ticket assigned to the chat tech (transferred before the ticket)', t['assignees'] == ['itchat.test.tech2'], t)
+check('type Change files a Request ticket', t['type'] == 2, t)
+check('ticket linked to the new Change', t['changes'] == [r['changes_id']], t)
+check('impact saved, priority from urgency x impact', t['impact'] == 5 and t['priority'] >= 4, t)
+check('device linked to the ticket', f'Computer:{pc}' in t['items'], t['items'])
 for s in (u1, u2):
     close_open_chat(s)
 

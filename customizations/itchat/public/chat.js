@@ -499,8 +499,9 @@
                 name.value = f.title;
                 name.required = true;
 
-                // No default type: the technician has to choose Incident, Request or Problem.
-                // Problem = an Incident ticket linked to a Problem, so it uses Incident categories.
+                // No default type: the technician has to choose Incident, Request, Problem or Change.
+                // Problem = an Incident ticket linked to a Problem, so it uses Incident categories;
+                // Change = a Request ticket linked to a Change (Request categories, approval rule).
                 const isIncidentLike = () => type.value === String(f.types[0].value) || type.value === 'problem';
                 const type = el('select', 'form-select form-select-sm');
                 type.required = true;
@@ -549,18 +550,33 @@
                 const urg = el('select', 'form-select form-select-sm');
                 f.urgencies.forEach((u) => urg.appendChild(option(u.value, u.label, u.value === 3)));
 
-                // Problem (type "Problem" only): new Problem from this ticket, or an open one.
-                const pr = f.problems || {};
-                const prob = el('select', 'form-select form-select-sm');
-                if (pr.create) prob.appendChild(option(-1, '➕ สร้าง Problem ใหม่จาก Ticket นี้', true));
-                (pr.open || []).forEach((p) => prob.appendChild(option(p.id, '#' + p.id + ' ' + p.name, false)));
-                const probField = field('Problem', prob,
-                    'ปัญหาที่เกิดซ้ำ: สร้าง Incident จากแชทนี้แล้วเชื่อมไว้ใต้ Problem (Incident ที่มีสาเหตุเดียวกันเชื่อมไว้ที่ Problem เดียว)');
-                const showProblem = () => {
-                    probField.hidden = type.value !== 'problem';
+                // Impact: with urgency, GLPI works out the priority.
+                const imp = el('select', 'form-select form-select-sm');
+                (f.impacts || []).forEach((u) => imp.appendChild(option(u.value, u.label, u.value === 3)));
+
+                // The requester's own devices (optional).
+                const itemSel = el('select', 'form-select form-select-sm');
+                itemSel.appendChild(option('', (f.items || []).length ? '— ไม่ระบุ —' : '— ผู้ใช้ไม่มีอุปกรณ์ในระบบ —', true));
+                (f.items || []).forEach((i) => itemSel.appendChild(option(i.value, i.label, false)));
+                itemSel.disabled = !(f.items || []).length;
+
+                // Problem / Change (only for that type): a new one from this ticket, or an open one.
+                const linkField = (opts, label, hint) => {
+                    const sel = el('select', 'form-select form-select-sm');
+                    if (opts.create) sel.appendChild(option(-1, '➕ สร้าง ' + label + ' ใหม่จาก Ticket นี้', true));
+                    (opts.open || []).forEach((p) => sel.appendChild(option(p.id, '#' + p.id + ' ' + p.name, false)));
+                    return { sel, wrap: field(label, sel, hint) };
                 };
-                showProblem();
-                type.addEventListener('change', showProblem);
+                const prob = linkField(f.problems || {}, 'Problem',
+                    'ปัญหาที่เกิดซ้ำ: สร้าง Incident จากแชทนี้แล้วเชื่อมไว้ใต้ Problem (Incident ที่มีสาเหตุเดียวกันเชื่อมไว้ที่ Problem เดียว)');
+                const chg = linkField(f.changes || {}, 'Change',
+                    'ขอเปลี่ยนแปลงระบบ: สร้าง Request จากแชทนี้แล้วเชื่อมกับ Change ที่ใช้วางแผน/อนุมัติการเปลี่ยนแปลง');
+                const showLinks = () => {
+                    prob.wrap.hidden = type.value !== 'problem';
+                    chg.wrap.hidden = type.value !== 'change';
+                };
+                showLinks();
+                type.addEventListener('change', showLinks);
 
                 card.append(
                     field('ชื่อเรื่อง', name),
@@ -568,8 +584,12 @@
                     groupInfo,
                     field('หมวดหมู่', cat, 'ทีมผู้ดูแลและ SLA กำหนดตาม Business rules ที่เปิดใช้อยู่ (Setup > Rules)'),
                     field('ความเร่งด่วน', urg),
-                    probField
+                    field('ผลกระทบ', imp, 'ความเร่งด่วน + ผลกระทบ = ลำดับความสำคัญ (Priority)'),
+                    field('อุปกรณ์ที่เกี่ยวข้อง', itemSel),
+                    prob.wrap,
+                    chg.wrap
                 );
+                if (f.assignee) card.append(el('div', 'itchat-assignee-info', 'ผู้รับผิดชอบ Ticket: ' + f.assignee));
 
                 const btns = el('div', 'itchat-modal-actions');
                 const cancel = el('button', 'btn btn-sm btn-outline-secondary', 'ยกเลิก');
@@ -585,7 +605,7 @@
                 card.addEventListener('submit', (e) => {
                     e.preventDefault();
                     submit.disabled = true;
-                    state.selfAssigned.add(convId); // creating the ticket assigns me if nobody had it
+                    if (!f.assignee_other) state.selfAssigned.add(convId); // creating the ticket assigns me if nobody had it
                     post({
                         action: 'toticket',
                         conv: convId,
@@ -593,16 +613,23 @@
                         type: type.value,
                         itilcategories_id: cat.value,
                         urgency: urg.value,
-                        problem: type.value === 'problem' ? prob.value : 0,
+                        impact: imp.value || 3,
+                        item: itemSel.value,
+                        problem: type.value === 'problem' ? prob.sel.value : 0,
+                        change: type.value === 'change' ? chg.sel.value : 0,
                     }).done((r) => {
                         closeTicketDialog();
                         if (typeof glpi_toast_info === 'function') {
                             glpi_toast_info('สร้าง Ticket #' + r.tickets_id + ' แล้ว'
-                                + (r.problems_id ? ' · เชื่อมกับ Problem #' + r.problems_id : ''));
+                                + (r.problems_id ? ' · เชื่อมกับ Problem #' + r.problems_id : '')
+                                + (r.changes_id ? ' · เชื่อมกับ Change #' + r.changes_id : ''));
                         }
-                        if (r.problem_failed && typeof glpi_toast_warning === 'function') {
-                            glpi_toast_warning('สร้าง Ticket แล้ว แต่เชื่อมโยง Problem ไม่สำเร็จ ทำต่อได้ที่แท็บ Problems ของ Ticket');
-                        }
+                        ['problem', 'change'].forEach((k) => {
+                            if (r[k + '_failed'] && typeof glpi_toast_warning === 'function') {
+                                const label = k === 'problem' ? 'Problem' : 'Change';
+                                glpi_toast_warning('สร้าง Ticket แล้ว แต่เชื่อมโยง ' + label + ' ไม่สำเร็จ ทำต่อได้ที่แท็บ ' + label + 's ของ Ticket');
+                            }
+                        });
                         refresh();
                     }).fail((xhr) => {
                         submit.disabled = false;
@@ -937,25 +964,32 @@
 })();
 
 /**
- * Dashboards (central, the mini one above ticket lists, ...) keep their card numbers from page load:
- * GLPI only reloads them after the user switches on the dashboard's own auto-refresh toggle, while
- * lists already follow "Automatically refresh data" (refresh_views, setup-22). Switch that toggle on
- * at load so the cards follow the same interval. Here because this is the plugin whose JS is on
- * every page; nothing to do with the chat itself.
+ * Auto-refresh of everything that shows live data, every "Automatically refresh data" minutes
+ * (refresh_views, setup-22). GLPI itself only refreshes the Ticket list (front/ticket.php) and kanban:
+ *  - dashboards (central, the mini one above ticket lists, ...): their own auto-refresh toggle,
+ *    which GLPI leaves off, is switched on at load;
+ *  - every other search list (Problems, Changes, assets, users, ...): refreshed in place, the way
+ *    front/ticket.php does it;
+ *  - the home page tabs (Personal / Group view lists): the open tab is reloaded.
+ * Never while the user is busy there (rows ticked for a bulk action, typing, a dialog open), and
+ * a background browser tab catches up when it is shown again. Item forms are never reloaded.
+ * Here because this is the plugin whose JS is on every page; nothing to do with the chat itself.
  */
 (function () {
     'use strict';
 
-    if (window.self !== window.top || window.itchatDashboardRefresh || typeof $ === 'undefined'
-        || typeof CFG_GLPI === 'undefined' || !(parseInt(CFG_GLPI.refresh_views, 10) > 0)) {
+    const minutes = typeof CFG_GLPI !== 'undefined' ? parseInt(CFG_GLPI.refresh_views, 10) : 0;
+    if (window.self !== window.top || window.itchatAutoRefresh || typeof $ === 'undefined' || !(minutes > 0)) {
         return;
     }
-    window.itchatDashboardRefresh = true;
+    window.itchatAutoRefresh = true;
+    const period = minutes * 60 * 1000;
+    const path = window.location.pathname;
 
-    // The toggle's click handler is bound when the dashboard initialises, which can be after
-    // DOM ready (and dashboards in tabs load later), so look again for a while.
+    // Dashboards: the toggle's click handler is bound when the dashboard initialises, which can be
+    // after DOM ready (and dashboards in tabs load later), so look again for a while.
     let tries = 0;
-    const enable = () => {
+    const enableDashboards = () => {
         document.querySelectorAll('.dashboard .toolbar .auto-refresh:not(.active):not([data-itchat-auto])').forEach((btn) => {
             $(btn).trigger('click');
             if (btn.classList.contains('active')) {
@@ -963,8 +997,35 @@
             }
         });
         if (++tries < 30) {
-            setTimeout(enable, 1000);
+            setTimeout(enableDashboards, 1000);
         }
     };
-    $(enable);
+    $(enableDashboards);
+
+    const busy = (root) => {
+        const active = document.activeElement;
+        return root.querySelector('input.massive_action_checkbox:checked') !== null
+            || (active && root.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))
+            || document.querySelector('.modal.show') !== null;
+    };
+
+    let last = Date.now();
+    const refresh = () => {
+        last = Date.now();
+        if (!/\/front\/ticket\.php$/.test(path)) { // has its own timer
+            document.querySelectorAll('div.ajax-container.search-display-data').forEach((list) => {
+                const view = $(list).data('js_class');
+                if (view && !busy(list)) view.getView().refreshResults();
+            });
+        }
+        if (/\/front\/central\.php$/.test(path) && typeof window.reloadTab === 'function') {
+            const pane = document.querySelector('main #tabspanel ~ * .tab-pane.active, main .tab-content .tab-pane.active');
+            // a dashboard tab refreshes itself (above)
+            if (pane && !pane.querySelector('.dashboard') && !busy(pane)) window.reloadTab('');
+        }
+    };
+    setInterval(() => { if (!document.hidden) refresh(); }, period);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && Date.now() - last >= period) refresh();
+    });
 })();

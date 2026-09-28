@@ -52,11 +52,17 @@ Files are served through `ajax/chat.php?action=file&msg=<id>`, gated by *convers
 (self-service users have none). Images show inline, except SVG, which is always a download (same rule as GLPI core).
 **เปิด Ticket** opens a dialog before creating the ticket (1.3.0+). It has these fields:
 - title, pre-filled with "แชท: " + the user's first message
-- type (Incident/Request/Problem), *required with no default* (1.4.0+), so a Request is never filed as an Incident by accident.
-  Problem is not a GLPI ticket type: it files an **Incident** ticket and links it to a Problem (below). Offered only to techs who may create or link Problems
+- type (Incident/Request/Problem/Change), *required with no default* (1.4.0+), so a Request is never filed as an Incident by accident.
+  Problem and Change are not GLPI ticket types: Problem files an **Incident** ticket linked to a Problem, Change a **Request**
+  ticket linked to a Change (below). Each is offered only to techs who may create or link them
 - category, filtered to categories flagged for that type and visible in the tech's entities
-- urgency, limited to the values enabled in `urgency_mask`
-- Problem (type Problem only, required): **สร้าง Problem ใหม่จาก Ticket นี้** (default) / link to an open Problem (not solved or closed, in the tech's entities). A new Problem is made the way GLPI's own "Create a problem from this ticket" does it (`_tickets_id`), with the tech as assignee. Needs the `problem` UPDATE right to list/link and CREATE to make one. The API still accepts `type=1` with `problem=<id|-1>`. The requester is not told about the Problem.
+- urgency and impact, limited to the values enabled in `urgency_mask` / `impact_mask`; GLPI works out the priority from them
+- related device (optional): one of the requester's own items (those whose *User* is them, among GLPI's ticket item types),
+  linked to the ticket (Items tab)
+- Problem / Change (for that type only, required): **สร้าง … ใหม่จาก Ticket นี้** (default) / link to an open one (not solved or closed, in the tech's entities). A new one is made the way GLPI's own "Create a problem / change from this ticket" does it (`_tickets_id`), with the ticket's assignee. Needs the `problem` / `change` UPDATE right to list/link and CREATE to make one. The API still accepts `type=1` + `problem=<id|-1>` and `type=2` + `change=<id|-1>`. The requester is not told about the Problem / Change.
+
+The ticket is **assigned to the chat's technician**, i.e. whoever holds the chat when it is opened (it may have been
+transferred first), or to the tech clicking เปิด Ticket when nobody has claimed the chat yet. The dialog shows who that is.
 
 The ticket also gets a **requester group**, so the "Request needs manager approval" rule (setup-08) can find an approver. That is the user's default group, else their only group, and only if it is flagged `is_requester`.
 The dialog tells the technician up front whether a Request will actually go to approval: no group, a group without a manager, or a group whose manager will be asked.
@@ -92,3 +98,14 @@ Disable: Setup > Plugins, or `php bin/console plugin:deactivate itchat`.
 A legacy script in GLPI 11 must `return` a **Symfony** `Response`. `Glpi\Http\JSONResponse` is a
 PSR-7 (Guzzle) response, so `LegacyFileLoadController` ignores it and sends an empty 200. Use
 `Symfony\Component\HttpFoundation\JsonResponse` instead.
+
+## Also in this plugin (not chat)
+
+`public/chat.js` is the only custom JS on every page, so two unrelated helpers live at its end:
+- **Auto-refresh of everything** every *Automatically refresh data* minutes (`refresh_views`, setup-22). GLPI itself only
+  refreshes the Ticket list and kanban. Dashboards get their own auto-refresh toggle switched on, every other search list is
+  refreshed in place, and the home page's open tab is reloaded. Skipped while the user is busy there (rows ticked, typing,
+  a dialog open); item forms are never reloaded.
+- **Technicians' default profile** (`plugin_itchat_profile_added()`, ITEM_ADD on Profile_User): GLPI gives every new user
+  Self-Service as default profile, so a technician kept landing on the Helpdesk (and chatted as a requester). A user given a
+  central profile while their default is a Self-Service one (or none) gets it as default. A central default is left alone.

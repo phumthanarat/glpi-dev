@@ -46,8 +46,12 @@ function plugin_init_itchat(): void
     $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['itchat'] = [$assets['js']];
     $PLUGIN_HOOKS[Hooks::ADD_CSS]['itchat']        = [$assets['css']];
 
-    // Ticket followups -> chat (see plugin_itchat_followup_added()).
-    $PLUGIN_HOOKS[Hooks::ITEM_ADD]['itchat'] = [ITILFollowup::class => 'plugin_itchat_followup_added'];
+    // Ticket followups -> chat (see plugin_itchat_followup_added()); a technician's profile
+    // becomes their default one (see plugin_itchat_profile_added()).
+    $PLUGIN_HOOKS[Hooks::ITEM_ADD]['itchat'] = [
+        ITILFollowup::class => 'plugin_itchat_followup_added',
+        Profile_User::class => 'plugin_itchat_profile_added',
+    ];
     // Dashboard cards (satisfaction, chats today, waiting chats).
     $PLUGIN_HOOKS[Hooks::DASHBOARD_CARDS]['itchat'] = 'plugin_itchat_dashboard_cards';
 
@@ -258,6 +262,33 @@ function plugin_itchat_technicians(): array
     }
     asort($out, SORT_NATURAL | SORT_FLAG_CASE);
     return $out;
+}
+
+/**
+ * ITEM_ADD hook: a user given a central (technician-side) profile while their default profile is
+ * a Self-Service one - every new GLPI user gets Self-Service as default - gets the new profile as
+ * default. Otherwise they keep landing on the Helpdesk at login, and for IT Chat they are a requester,
+ * not a technician. A default profile someone chose on purpose (a central one) is left alone.
+ */
+function plugin_itchat_profile_added(Profile_User $pu): void
+{
+    global $DB;
+    $profile = new Profile();
+    $user = new User();
+    if (
+        !$profile->getFromDB((int) $pu->fields['profiles_id'])
+        || $profile->fields['interface'] !== 'central'
+        || !$user->getFromDB((int) $pu->fields['users_id'])
+    ) {
+        return;
+    }
+    $current = new Profile();
+    if ((int) $user->fields['profiles_id'] > 0 && $current->getFromDB((int) $user->fields['profiles_id'])
+        && $current->fields['interface'] === 'central') {
+        return;
+    }
+    // Direct SQL: User::update() needs rights the LDAP sync / rules running this may not have.
+    $DB->update(User::getTable(), ['profiles_id' => $profile->getID()], ['id' => $user->getID()]);
 }
 
 /**

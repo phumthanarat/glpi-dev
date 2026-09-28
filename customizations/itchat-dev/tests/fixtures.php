@@ -115,17 +115,19 @@ function teardown(): array
         'FROM'   => 'glpi_tickets',
         'WHERE'  => ['OR' => [['name' => ['LIKE', 'แชท: [itchat-test]%']], ['name' => ['LIKE', '[itchat-test]%']]]],
     ])), 'id'))));
-    // Problems made from test chats (title "แชท: [itchat-test]...") or by the tests ("[itchat-test]...").
-    $done['problems'] = 0;
-    foreach (
-        $DB->request([
-            'SELECT' => 'id',
-            'FROM'   => 'glpi_problems',
-            'WHERE'  => ['OR' => [['name' => ['LIKE', 'แชท: [itchat-test]%']], ['name' => ['LIKE', '[itchat-test]%']]]],
-        ]) as $r
-    ) {
-        if ((new Problem())->delete(['id' => $r['id']], true)) {
-            $done['problems']++;
+    // Problems / Changes made from test chats (title "แชท: [itchat-test]...") or by the tests ("[itchat-test]...").
+    foreach ([Problem::class => 'problems', Change::class => 'changes'] as $itemtype => $key) {
+        $done[$key] = 0;
+        foreach (
+            $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => $itemtype::getTable(),
+                'WHERE'  => ['OR' => [['name' => ['LIKE', 'แชท: [itchat-test]%']], ['name' => ['LIKE', '[itchat-test]%']]]],
+            ]) as $r
+        ) {
+            if ((new $itemtype())->delete(['id' => $r['id']], true)) {
+                $done[$key]++;
+            }
         }
     }
     if ($ticket_ids !== []) {
@@ -286,6 +288,11 @@ switch ($argv[1] ?? '') {
                 'assign_groups'     => $groups(CommonITILActor::ASSIGN),
                 'approvers'         => $approvers,
                 'documents'         => countElementsInTable('glpi_documents_items', ['itemtype' => 'Ticket', 'items_id' => $tid]),
+                'impact'            => (int) $t->fields['impact'],
+                'priority'          => (int) $t->fields['priority'],
+                'changes'           => array_values(array_map('intval', array_column(iterator_to_array(
+                    $DB->request(['SELECT' => 'changes_id', 'FROM' => 'glpi_changes_tickets', 'WHERE' => ['tickets_id' => $tid]])
+                ), 'changes_id'))),
                 'problems'          => array_values(array_map('intval', array_column(iterator_to_array(
                     $DB->request(['SELECT' => 'problems_id', 'FROM' => 'glpi_problems_tickets', 'WHERE' => ['tickets_id' => $tid]])
                 ), 'problems_id'))),
@@ -503,6 +510,20 @@ switch ($argv[1] ?? '') {
             'is_private' => $private,
         ]);
         echo json_encode(['followup' => $id]), "\n";
+        break;
+
+    case 'give-computer':
+        // php fixtures.php give-computer <login> : a computer whose User is that account (teardown: "[itchat-test]%")
+        $id = (new Computer())->add(['name' => '[itchat-test] PC of ' . $argv[2], 'entities_id' => 0, 'users_id' => userId($argv[2])]);
+        echo json_encode(['computer' => $id]), "\n";
+        break;
+
+    case 'default-profile':
+        // php fixtures.php default-profile <login> : name of the account's default profile ("" = none)
+        $u = new User();
+        $u->getFromDB(userId($argv[2]));
+        $p = new Profile();
+        echo json_encode(['profile' => $p->getFromDB((int) $u->fields['profiles_id']) ? $p->fields['name'] : '']), "\n";
         break;
 
     case 'ticket-status':

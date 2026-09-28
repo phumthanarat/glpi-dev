@@ -286,7 +286,7 @@
 .itchat-modal-title { font-weight: 600; font-size: 1rem; margin-bottom: 12px; }
 .itchat-modal-card .form-hint { font-size: .72rem; margin-top: 2px; }
 .itchat-modal-card select:invalid { border-color: var(--tblr-danger, #d63939); }
-.itchat-group-info { font-size: .75rem; margin: -2px 0 8px; color: var(--tblr-secondary, #6c7a91); }
+.itchat-group-info, .itchat-assignee-info { font-size: .75rem; margin: -2px 0 8px; color: var(--tblr-secondary, #6c7a91); }
 .itchat-group-info.warn { color: var(--tblr-warning-text-emphasis, #9a6700); }
 .itchat-group-info.ok { color: var(--tblr-success, #2fb344); }
 .itchat-modal-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }

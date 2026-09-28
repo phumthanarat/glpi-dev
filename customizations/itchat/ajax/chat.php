@@ -9,9 +9,12 @@
  * POST action=claim      conv=<id>                    (tech)
  * POST action=close      conv=<id>
  * GET  action=ticketform conv=<id>                    (tech: suggested title + categories for the dialog)
- * POST action=toticket   conv=<id> [name, type, itilcategories_id, urgency, problem]  (tech;
- *                        type: 1 = Incident, 2 = Request, 'problem' = Incident linked to a Problem;
- *                        problem: 0 = none, -1 = new Problem from this ticket, <id> = link to that open Problem)
+ * POST action=toticket   conv=<id> [name, type, itilcategories_id, urgency, impact, item, problem, change]  (tech;
+ *                        type: 1 = Incident, 2 = Request, 'problem' = Incident linked to a Problem,
+ *                              'change' = Request linked to a Change;
+ *                        item: "<itemtype>:<id>" of one of the requester's devices, or empty;
+ *                        problem / change: 0 = none, -1 = new one from this ticket, <id> = link to that open one;
+ *                        assigned to the chat's technician, or to the caller when nobody has the chat)
  * GET  action=techs                                   (tech: who a chat can be transferred to)
  * POST action=transfer   conv=<id> users_id=<tech>    (tech; an open ticket of the chat is reassigned too)
  * POST action=rate       conv=<id> value=1..5         (requester, closed chat, once)
@@ -187,12 +190,12 @@ $requester_group = static function (int $users_id) use ($DB): ?array {
     ];
 };
 
-/** Urgency values enabled in Setup > General > Assistance (urgency_mask), high to low. */
-$urgencies = static function () use ($CFG_GLPI): array {
+/** Urgency (or impact) values enabled in Setup > General > Assistance (urgency_mask / impact_mask), high to low. */
+$urgencies = static function (string $mask = 'urgency_mask') use ($CFG_GLPI): array {
     $labels = [5 => 'สูงมาก', 4 => 'สูง', 3 => 'ปานกลาง', 2 => 'ต่ำ', 1 => 'ต่ำมาก'];
     $out = [];
     foreach ($labels as $v => $label) {
-        if ($v === 3 || ((int) $CFG_GLPI['urgency_mask'] & (1 << $v))) {
+        if ($v === 3 || ((int) $CFG_GLPI[$mask] & (1 << $v))) {
             $out[] = ['value' => $v, 'label' => $label];
         }
     }
@@ -200,21 +203,54 @@ $urgencies = static function () use ($CFG_GLPI): array {
 };
 
 /**
+ * The requester's own devices (items whose "User" is them) that can be linked to a ticket, for the
+ * dialog's "อุปกรณ์ที่เกี่ยวข้อง" field. value = "<itemtype>:<id>".
+ * @return list<array{value:string, label:string}>
+ */
+$requester_items = static function (int $users_id) use ($DB, $CFG_GLPI): array {
+    $out = [];
+    foreach ($CFG_GLPI['ticket_types'] as $itemtype) {
+        if (!is_a($itemtype, CommonDBTM::class, true) || !$itemtype::canView()) {
+            continue;
+        }
+        $table = $itemtype::getTable();
+        if (!$DB->fieldExists($table, 'users_id') || !$DB->fieldExists($table, 'name')) {
+            continue;
+        }
+        $where = ['users_id' => $users_id];
+        foreach (['is_deleted', 'is_template'] as $flag) {
+            if ($DB->fieldExists($table, $flag)) {
+                $where[$flag] = 0;
+            }
+        }
+        foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => $table, 'WHERE' => $where, 'ORDER' => 'name', 'LIMIT' => 50]) as $row) {
+            $out[] = [
+                'value' => $itemtype . ':' . $row['id'],
+                'label' => $itemtype::getTypeName(1) . ' - ' . ($row['name'] !== '' ? $row['name'] : '#' . $row['id']),
+            ];
+        }
+    }
+    return $out;
+};
+
+/**
  * What the dialog may offer for linking the new ticket to a Problem (ITIL: incidents with the same
- * root cause go under one Problem). 'open' lists not-yet-solved Problems in the tech's entities,
- * newest first; null when the tech has no right to update Problems.
+ * root cause go under one Problem) or a Change (a request that changes the system goes through one).
+ * 'open' lists not-yet-solved ones in the tech's entities, newest first; null when the tech has no
+ * right to update them.
+ * @param class-string<Problem|Change> $itemtype
  * @return array{create:bool, open:list<array{id:int, name:string}>|null}
  */
-$problem_options = static function () use ($DB): array {
+$link_options = static function (string $itemtype) use ($DB): array {
     $open = null;
-    if (Session::haveRight(Problem::$rightname, UPDATE)) {
+    if (Session::haveRight($itemtype::$rightname, UPDATE)) {
         $open = [];
         foreach (
             $DB->request([
                 'SELECT' => ['id', 'name'],
-                'FROM'   => Problem::getTable(),
-                'WHERE'  => ['is_deleted' => 0, 'status' => Problem::getNotSolvedStatusArray()]
-                    + getEntitiesRestrictCriteria(Problem::getTable()),
+                'FROM'   => $itemtype::getTable(),
+                'WHERE'  => ['is_deleted' => 0, 'status' => $itemtype::getNotSolvedStatusArray()]
+                    + getEntitiesRestrictCriteria($itemtype::getTable()),
                 'ORDER'  => 'id DESC',
                 'LIMIT'  => 200,
             ]) as $p
@@ -222,7 +258,16 @@ $problem_options = static function () use ($DB): array {
             $open[] = ['id' => (int) $p['id'], 'name' => $p['name']];
         }
     }
-    return ['create' => Problem::canCreate(), 'open' => $open];
+    return ['create' => $itemtype::canCreate(), 'open' => $open];
+};
+
+/**
+ * Who a chat's ticket is assigned to: the chat's technician (the chat may have been transferred
+ * before the ticket is opened), or the tech opening it when nobody has the chat yet.
+ */
+$chat_assignee = static function (array $conv) use ($me): int {
+    $tech = (int) $conv['users_id_tech'];
+    return $tech > 0 && array_key_exists($tech, plugin_itchat_technicians()) ? $tech : $me;
 };
 
 switch ($action) {
@@ -235,20 +280,34 @@ switch ($action) {
             return $fail('conversation not found', 404);
         }
         Session::writeClose();
-        $popts = $problem_options();
+        $popts = $link_options(Problem::class);
+        $copts = $link_options(Change::class);
+        $assignee = $chat_assignee($conv); // shown in the dialog
         return new JsonResponse([
+            'assignee'   => $name_of($assignee),
+            'assignee_other' => $assignee !== $me,
             'title'      => $suggest_title($conv),
             'requester_group' => $requester_group((int) $conv['users_id']),
             'categories' => array_values($ticket_categories()),
             'urgencies'  => $urgencies(),
+            'impacts'    => $urgencies('impact_mask'),
+            'items'      => $requester_items((int) $conv['users_id']),
             'problems'   => $popts,
-            'types'      => array_merge([
-                ['value' => Ticket::INCIDENT_TYPE, 'label' => 'Incident (แจ้งปัญหา)'],
-                ['value' => Ticket::DEMAND_TYPE,   'label' => 'Request (ขอใช้บริการ)'],
-            ], $popts['create'] || !empty($popts['open'])
-                // Not a ticket type in GLPI: an Incident ticket that goes under a Problem.
-                ? [['value' => 'problem', 'label' => 'Problem (ปัญหาที่เกิดซ้ำ / ต้องหาสาเหตุ)']]
-                : []),
+            'changes'    => $copts,
+            'types'      => array_merge(
+                [
+                    ['value' => Ticket::INCIDENT_TYPE, 'label' => 'Incident (แจ้งปัญหา)'],
+                    ['value' => Ticket::DEMAND_TYPE,   'label' => 'Request (ขอใช้บริการ)'],
+                ],
+                // Not ticket types in GLPI: an Incident ticket that goes under a Problem, a Request
+                // ticket that goes through a Change.
+                $popts['create'] || !empty($popts['open'])
+                    ? [['value' => 'problem', 'label' => 'Problem (ปัญหาที่เกิดซ้ำ / ต้องหาสาเหตุ)']]
+                    : [],
+                $copts['create'] || !empty($copts['open'])
+                    ? [['value' => 'change', 'label' => 'Change (ขอเปลี่ยนแปลงระบบ)']]
+                    : []
+            ),
         ]);
 
     case 'poll':
@@ -690,17 +749,19 @@ switch ($action) {
             return new JsonResponse(['ok' => true]);
         }
 
-        // toticket: transcript -> new Ticket, requester = chat user, assigned = me.
+        // toticket: transcript -> new Ticket, requester = chat user, assigned = the chat's tech (or me).
         if ((int) $conv['tickets_id'] > 0) {
             return $fail('ticket already created');
         }
         // Fields from the dialog.
-        // Type is required: the technician must pick Incident, Request or Problem explicitly.
-        // 'problem' = an Incident ticket that must be linked to a (new or open) Problem.
+        // Type is required: the technician must pick Incident, Request, Problem or Change explicitly.
+        // 'problem' = an Incident ticket that must be linked to a (new or open) Problem,
+        // 'change'  = a Request ticket that must be linked to a (new or open) Change.
         $as_problem = ($_POST['type'] ?? '') === 'problem';
-        $type = $as_problem ? Ticket::INCIDENT_TYPE : (int) ($_POST['type'] ?? 0);
+        $as_change  = ($_POST['type'] ?? '') === 'change';
+        $type = $as_problem ? Ticket::INCIDENT_TYPE : ($as_change ? Ticket::DEMAND_TYPE : (int) ($_POST['type'] ?? 0));
         if (!in_array($type, [Ticket::INCIDENT_TYPE, Ticket::DEMAND_TYPE], true)) {
-            return $fail('กรุณาเลือกประเภท Ticket (Incident, Request หรือ Problem)');
+            return $fail('กรุณาเลือกประเภท Ticket (Incident, Request, Problem หรือ Change)');
         }
         $category_id = (int) ($_POST['itilcategories_id'] ?? 0);
         if ($category_id > 0) {
@@ -713,20 +774,40 @@ switch ($action) {
         if (!in_array($urgency, array_column($urgencies(), 'value'), true)) {
             return $fail('ความเร่งด่วนไม่ถูกต้อง');
         }
-        // Optional Problem link, incidents only: -1 = new Problem from this ticket, <id> = existing one.
-        $problem = (int) ($_POST['problem'] ?? ($as_problem ? -1 : 0));
-        if ($as_problem && $problem === 0) {
-            return $fail('กรุณาเลือก Problem');
+        $impact = (int) ($_POST['impact'] ?? 3);
+        if (!in_array($impact, array_column($urgencies('impact_mask'), 'value'), true)) {
+            return $fail('ผลกระทบไม่ถูกต้อง');
         }
-        if ($problem !== 0) {
-            $popts = $problem_options();
-            if ($type !== Ticket::INCIDENT_TYPE) {
-                return $fail('เชื่อมโยง Problem ได้เฉพาะ Incident');
-            }
-            if ($problem === -1 ? !$popts['create'] : !in_array($problem, array_column($popts['open'] ?? [], 'id'), true)) {
-                return $fail('ไม่มีสิทธิ์หรือไม่พบ Problem ที่เลือก');
-            }
+        // Optional device: one of the requester's own items (the list the dialog offered).
+        $item = (string) ($_POST['item'] ?? '');
+        if ($item !== '' && !in_array($item, array_column($requester_items((int) $conv['users_id']), 'value'), true)) {
+            return $fail('ไม่พบอุปกรณ์ที่เลือก');
         }
+        // Problem link (Incident only) / Change link (Request only): -1 = new one from this ticket, <id> = existing one.
+        $links = [];
+        foreach (
+            [
+                ['class' => Problem::class, 'field' => 'problem', 'required' => $as_problem, 'type' => Ticket::INCIDENT_TYPE, 'only' => 'Incident'],
+                ['class' => Change::class,  'field' => 'change',  'required' => $as_change,  'type' => Ticket::DEMAND_TYPE,   'only' => 'Request'],
+            ] as $l
+        ) {
+            $id = (int) ($_POST[$l['field']] ?? ($l['required'] ? -1 : 0));
+            if ($l['required'] && $id === 0) {
+                return $fail('กรุณาเลือก ' . $l['class']);
+            }
+            if ($id === 0) {
+                continue;
+            }
+            $opts = $link_options($l['class']);
+            if ($type !== $l['type']) {
+                return $fail(sprintf('เชื่อมโยง %s ได้เฉพาะ %s', $l['class'], $l['only']));
+            }
+            if ($id === -1 ? !$opts['create'] : !in_array($id, array_column($opts['open'] ?? [], 'id'), true)) {
+                return $fail(sprintf('ไม่มีสิทธิ์หรือไม่พบ %s ที่เลือก', $l['class']));
+            }
+            $links[$l['class']] = $id;
+        }
+        $assignee = $chat_assignee($conv);
         $custom_title = trim(preg_replace('/\s+/u', ' ', (string) ($_POST['name'] ?? '')));
         $lines = [];
         $doc_ids = [];
@@ -765,20 +846,27 @@ switch ($action) {
             'type'                => $type,
             'itilcategories_id'   => $category_id,
             'urgency'             => $urgency,
+            'impact'              => $impact,
             '_users_id_requester' => (int) $conv['users_id'],
-            '_users_id_assign'    => $me,
-        ] + (($rg = $requester_group((int) $conv['users_id'])) !== null ? ['_groups_id_requester' => $rg['id']] : []));
+            '_users_id_assign'    => $assignee,
+        ]
+            + (($rg = $requester_group((int) $conv['users_id'])) !== null ? ['_groups_id_requester' => $rg['id']] : [])
+            + ($item !== '' ? ['items_id' => [explode(':', $item)[0] => [(int) explode(':', $item)[1]]]] : []));
         if (!$tickets_id) {
             return $fail('ticket creation failed', 500);
         }
         // Profiles without the "assign" right (stock Technician only has OWN = "be in charge")
-        // get _users_id_assign silently dropped by add(). Mirror GLPI's own "Assign to me"
-        // button: add the actor afterwards when canAssignToMe() allows it.
+        // get _users_id_assign silently dropped by add(). For myself, mirror GLPI's own "Assign to
+        // me" button (canAssignToMe()); the chat's other tech already holds the chat, so they get
+        // the ticket the same way a chat transfer moves it.
         $ticket->getFromDB($tickets_id);
-        if ($ticket->countUsers(CommonITILActor::ASSIGN) === 0 && $ticket->canAssignToMe()) {
+        if (
+            $ticket->countUsers(CommonITILActor::ASSIGN) === 0
+            && ($assignee !== $me || $ticket->canAssignToMe())
+        ) {
             (new Ticket_User())->add([
                 'tickets_id' => $tickets_id,
-                'users_id'   => $me,
+                'users_id'   => $assignee,
                 'type'       => CommonITILActor::ASSIGN,
             ]);
         }
@@ -790,26 +878,30 @@ switch ($action) {
                 'items_id'     => $tickets_id,
             ]);
         }
-        // Problem link. The ticket already exists, so a failure here is reported, not fatal.
-        $problems_id = 0;
-        if ($problem === -1) {
-            // Same as GLPI's "Create a problem from this ticket": _tickets_id makes Problem::post_addItem
-            // add the Problem_Ticket link and copy the ticket's items.
-            $problems_id = (int) (new Problem())->add([
-                'name'              => $title,
-                'content'           => $ticket->fields['content'],
-                'entities_id'       => $ticket->fields['entities_id'],
-                'itilcategories_id' => $category_id,
-                'urgency'           => $urgency,
-                '_users_id_assign'  => $me,
-                '_tickets_id'       => $tickets_id,
-            ]);
-        } elseif ($problem > 0) {
-            $problems_id = (new Problem_Ticket())->add(['problems_id' => $problem, 'tickets_id' => $tickets_id]) ? $problem : 0;
+        // Problem / Change link. The ticket already exists, so a failure here is reported, not fatal.
+        $linked = [Problem::class => 0, Change::class => 0];
+        foreach ($links as $itemtype => $id) {
+            if ($id === -1) {
+                // Same as GLPI's "Create a problem / change from this ticket": _tickets_id makes
+                // post_addItem() add the Problem_Ticket / Change_Ticket link and copy the ticket's items.
+                $linked[$itemtype] = (int) (new $itemtype())->add([
+                    'name'              => $title,
+                    'content'           => $ticket->fields['content'],
+                    'entities_id'       => $ticket->fields['entities_id'],
+                    'itilcategories_id' => $category_id,
+                    'urgency'           => $urgency,
+                    'impact'            => $impact,
+                    '_users_id_assign'  => $assignee,
+                    '_tickets_id'       => $tickets_id,
+                ]);
+            } else {
+                $rel = $itemtype === Problem::class ? new Problem_Ticket() : new Change_Ticket();
+                $linked[$itemtype] = $rel->add([$itemtype::getForeignKeyField() => $id, 'tickets_id' => $tickets_id]) ? $id : 0;
+            }
         }
         $DB->update(
             ITCHAT_CONV,
-            ['tickets_id' => $tickets_id, 'users_id_tech' => $conv['users_id_tech'] ?: $me],
+            ['tickets_id' => $tickets_id, 'users_id_tech' => $assignee],
             ['id' => $conv['id']]
         );
         $add_msg((int) $conv['id'], 0, sprintf('เปิด Ticket #%d จากการสนทนานี้แล้ว', $tickets_id));
@@ -817,8 +909,11 @@ switch ($action) {
             'ok'          => true,
             'tickets_id'  => $tickets_id,
             'ticket_url'  => Ticket::getFormURLWithID($tickets_id),
-            'problems_id' => $problems_id,
-            'problem_failed' => $problem !== 0 && $problems_id === 0,
+            'assigned_to' => $assignee,
+            'problems_id' => $linked[Problem::class],
+            'problem_failed' => isset($links[Problem::class]) && $linked[Problem::class] === 0,
+            'changes_id'  => $linked[Change::class],
+            'change_failed' => isset($links[Change::class]) && $linked[Change::class] === 0,
         ]);
 }
 
