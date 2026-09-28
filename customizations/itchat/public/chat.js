@@ -933,3 +933,36 @@
         }
     });
 })();
+
+/**
+ * Dashboards (central, the mini one above ticket lists, ...) keep their card numbers from page load:
+ * GLPI only reloads them after the user switches on the dashboard's own auto-refresh toggle, while
+ * lists already follow "Automatically refresh data" (refresh_views, setup-22). Switch that toggle on
+ * at load so the cards follow the same interval. Here because this is the plugin whose JS is on
+ * every page; nothing to do with the chat itself.
+ */
+(function () {
+    'use strict';
+
+    if (window.self !== window.top || window.itchatDashboardRefresh || typeof $ === 'undefined'
+        || typeof CFG_GLPI === 'undefined' || !(parseInt(CFG_GLPI.refresh_views, 10) > 0)) {
+        return;
+    }
+    window.itchatDashboardRefresh = true;
+
+    // The toggle's click handler is bound when the dashboard initialises, which can be after
+    // DOM ready (and dashboards in tabs load later), so look again for a while.
+    let tries = 0;
+    const enable = () => {
+        document.querySelectorAll('.dashboard .toolbar .auto-refresh:not(.active):not([data-itchat-auto])').forEach((btn) => {
+            $(btn).trigger('click');
+            if (btn.classList.contains('active')) {
+                btn.dataset.itchatAuto = '1'; // done: if the user switches it off, leave it off
+            }
+        });
+        if (++tries < 30) {
+            setTimeout(enable, 1000);
+        }
+    };
+    $(enable);
+})();
