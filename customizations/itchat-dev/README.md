@@ -33,15 +33,15 @@ Asset cache-busting no longer depends on the version: GLPI serves plugin assets 
 ```bash
 customizations/itchat-dev/manual-test.sh up     # test accounts + an incoming chat from each requester
 customizations/itchat-dev/manual-test.sh chat   # one more incoming chat from each requester
+customizations/itchat-dev/manual-test.sh code   # current 2FA codes of the test technicians
 customizations/itchat-dev/manual-test.sh down   # delete the accounts with their chats, tickets and Problems
 ```
 
 Accounts (passwords printed by `up`, kept in `~/.itchat-manual-test`): requesters `demo.user`, `demo.user2`; technicians
 `demo.tech`, `demo.tech2`, `demo.hotliner`, `demo.supervisor` (one per technician profile, so every transfer can be tried);
 `demo.inactive`, a deactivated technician that must not be offered as a transfer target. `up` prints the transfer list GLPI computes.
-Technicians get the "2FA is required" page: press Skip during the grace period. A new GLPI user gets Self-Service as its
-*default* profile; the script makes the technician profile the default one, otherwise the account lands on the Helpdesk and is
-not a technician for IT Chat. Real technicians need the same (Administration > Users > Settings > Default profile).
+Technicians have 2FA set up with a known secret: `manual-test.sh code` prints their current codes (and the secrets, for an
+authenticator app). Their technician profile is their default one (the plugin does that for real technicians too).
 
 ## Tests
 

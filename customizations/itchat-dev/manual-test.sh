@@ -11,10 +11,12 @@
 #                           demo.inactive                              deactivated technician: must NOT
 #                                                                      be in the transfer list
 #   manual-test.sh chat   one more incoming chat from each requester (after `up`)
+#   manual-test.sh code   current 2FA code of each technician (their login asks for it)
 #   manual-test.sh down   delete all these accounts with their chats, tickets and Problems
 #
-# Passwords are printed and kept in ~/.itchat-manual-test (mode 600). Technicians log in through the
-# "2FA is required" page: press Skip during the grace period.
+# Passwords are printed and kept in ~/.itchat-manual-test (mode 600). Technicians have 2FA set up with
+# a known secret: at the code prompt, type what `manual-test.sh code` prints (or add the secret it
+# shows to an authenticator app).
 #
 # Env: NS (default glpi), GLPI_URL (default http://localhost:30080)
 
@@ -67,18 +69,30 @@ case "${1:-}" in
         out=$(php_in_pod users)
         printf '%s\n' "$out" | grep '^transfer list:'
         (umask 077; printf '%s\n' "$out" | tail -1 > "$CREDS")
-        python3 -c 'import json,sys; [print(f"{k:10} {v}") for k, v in json.load(open(sys.argv[1])).items()]' "$CREDS"
+        python3 -c 'import json,sys; [print(f"{k:16} {v}") for k, v in json.load(open(sys.argv[1])).items() if k != "_totp"]' "$CREDS"
         send_chat
         ;;
     chat)
         send_chat 1
+        ;;
+    code)
+        [ -f "$CREDS" ] || { echo "run '$0 up' first" >&2; exit 1; }
+        (cd "$HERE/tests" && python3 - "$CREDS" <<'EOF'
+import json, sys, time
+from totp import code
+secrets = json.load(open(sys.argv[1])).get('_totp', {})
+for login, secret in secrets.items():
+    print(f'{login:16} {code(secret)}   (secret {secret})')
+print(f'codes change in {int(30 - time.time() % 30)} s')
+EOF
+        )
         ;;
     down)
         php_in_pod clean | tail -1
         rm -f "$CREDS"
         ;;
     *)
-        echo "usage: $0 up|chat|down" >&2
+        echo "usage: $0 up|chat|code|down" >&2
         exit 2
         ;;
 esac

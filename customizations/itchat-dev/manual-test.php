@@ -5,8 +5,9 @@
  * requesters that open chats, and one technician per technician profile so every kind of
  * transfer can be tried. demo.inactive is a deactivated technician: never a transfer target.
  *
- *   php manual-test.php users   create them all (or reset name/profile/password); prints
- *                               the transfer list, then {"login": "password"} as the last line
+ *   php manual-test.php users   create them all (or reset name/profile/password; technicians get
+ *                               a new 2FA secret); prints the transfer list, then
+ *                               {"login": "password", ..., "_totp": {"login": "secret"}} as the last line
  *   php manual-test.php clean   delete them with their chats, tickets and the Problems that
  *                               only link those tickets
  */
@@ -74,6 +75,16 @@ switch ($argv[1] ?? '') {
             $DB->update('glpi_users', ['profiles_id' => $profile->getID(), 'is_active' => (int) $def['active']], ['id' => $id]);
             if ($def['active']) {
                 $creds[$login] = $password;
+            }
+            // 2FA is enforced for central profiles (setup-24) and the grace period ends for good:
+            // give technicians a known secret, like tests/fixtures.php does.
+            if ($def['active'] && $profile->fields['interface'] === 'central') {
+                $totp = new \Glpi\Security\TOTPManager();
+                $secret = $totp->createSecret();
+                $totp->setSecretForUser($id, $secret);
+                // backup codes exist, so GLPI doesn't stop the first login on its "your backup codes" page
+                $totp->regenerateBackupCodes($id);
+                $creds['_totp'][$login] = $secret;
             }
         }
         Plugin::load('itchat');
