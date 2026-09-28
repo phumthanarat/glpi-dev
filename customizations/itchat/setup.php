@@ -93,13 +93,15 @@ function plugin_itchat_check_config($verbose = false): bool
 }
 
 /**
- * Technician = central (standard) interface AND allowed to see all tickets.
- * Self-service users, and central users without that right, chat as requesters.
+ * Technician = central (standard) interface AND allowed to see all tickets AND to update them.
+ * The update right keeps out look-only central profiles (stock Observer, Read-Only). Self-service
+ * users, and central users without these rights, chat as requesters.
  */
 function plugin_itchat_is_technician(): bool
 {
     return Session::getCurrentInterface() === 'central'
-        && Session::haveRight(Ticket::$rightname, Ticket::READALL);
+        && Session::haveRight(Ticket::$rightname, Ticket::READALL)
+        && Session::haveRight(Ticket::$rightname, UPDATE);
 }
 
 /**
@@ -219,7 +221,7 @@ function plugin_itchat_post_google_chat(string $url, string $text): ?string
 
 /**
  * Users who count as technicians for chat transfer: active users having a central-interface
- * profile with the ticket READALL right (same rule as plugin_itchat_is_technician()).
+ * profile with the ticket READALL and UPDATE rights (same rule as plugin_itchat_is_technician()).
  *
  * @return array<int, string> id => display name
  */
@@ -242,7 +244,10 @@ function plugin_itchat_technicians(): array
                 'glpi_users.is_deleted'       => 0,
                 'glpi_profiles.interface'     => 'central',
                 'glpi_profilerights.name'     => Ticket::$rightname,
-                new Glpi\DBAL\QueryExpression('(`glpi_profilerights`.`rights` & ' . (int) Ticket::READALL . ') > 0'),
+                new Glpi\DBAL\QueryExpression(sprintf(
+                    '(`glpi_profilerights`.`rights` & %1$d) = %1$d',
+                    Ticket::READALL | UPDATE
+                )),
             ],
         ]) as $row
     ) {

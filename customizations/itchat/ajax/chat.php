@@ -13,7 +13,7 @@
  *                        type: 1 = Incident, 2 = Request, 'problem' = Incident linked to a Problem;
  *                        problem: 0 = none, -1 = new Problem from this ticket, <id> = link to that open Problem)
  * GET  action=techs                                   (tech: who a chat can be transferred to)
- * POST action=transfer   conv=<id> users_id=<tech>    (tech)
+ * POST action=transfer   conv=<id> users_id=<tech>    (tech; an open ticket of the chat is reassigned too)
  * POST action=rate       conv=<id> value=1..5         (requester, closed chat, once)
  * GET  action=search     q=<text>                     (tech: message text, requester name or ticket #)
  *
@@ -545,8 +545,29 @@ switch ($action) {
             return $fail('แชทนี้อยู่กับช่างคนนี้อยู่แล้ว');
         }
         $DB->update(ITCHAT_CONV, ['users_id_tech' => $target], ['id' => $conv['id']]);
-        $add_msg((int) $conv['id'], 0, sprintf('%s โอนแชทให้ %s', $name_of($me), $name_of($target)));
-        return new JsonResponse(['ok' => true]);
+        // The chat's ticket follows while it's still being worked on: the new tech takes the previous
+        // chat tech's place among the assignees (other assigned techs / groups stay as they are).
+        $ticket_moved = false;
+        $ticket = new Ticket();
+        if (
+            (int) $conv['tickets_id'] > 0
+            && $ticket->getFromDB((int) $conv['tickets_id'])
+            && !in_array((int) $ticket->fields['status'], array_merge(Ticket::getSolvedStatusArray(), Ticket::getClosedStatusArray()), true)
+        ) {
+            $actor = ['tickets_id' => $ticket->getID(), 'type' => CommonITILActor::ASSIGN];
+            $link = new Ticket_User();
+            if (!$link->getFromDBByCrit($actor + ['users_id' => $target])) {
+                $link->add($actor + ['users_id' => $target]);
+            }
+            $previous = (int) $conv['users_id_tech'];
+            if ($previous > 0 && $previous !== $target && $link->getFromDBByCrit($actor + ['users_id' => $previous])) {
+                $link->delete(['id' => $link->getID()]);
+            }
+            $ticket_moved = $link->getFromDBByCrit($actor + ['users_id' => $target]);
+        }
+        $add_msg((int) $conv['id'], 0, sprintf('%s โอนแชทให้ %s', $name_of($me), $name_of($target))
+            . ($ticket_moved ? sprintf(' (Ticket #%d ด้วย)', $ticket->getID()) : ''));
+        return new JsonResponse(['ok' => true, 'ticket_moved' => $ticket_moved]);
 
     case 'rate':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

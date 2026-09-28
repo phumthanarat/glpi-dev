@@ -5,13 +5,14 @@ A normal GLPI plugin (no core file edits, no image rebuild). Adds a floating
 
 | Who | Sees |
 |-----|------|
-| **Technician**: central interface + `ticket` READALL right (`plugin_itchat_is_technician()` in `setup.php`) | Inbox of all conversations (open + closed in the last 3 days), unread counts, "รอรับเรื่อง" marker. Can reply, **รับเรื่อง** (claim), **เปิด Ticket** (transcript → new Ticket, requester = chat user, assigned = self), **ปิด** (close). Replying to an unclaimed chat claims it automatically. |
+| **Technician**: central interface + `ticket` READALL and UPDATE rights (`plugin_itchat_is_technician()` in `setup.php`; look-only profiles such as Observer / Read-Only chat as requesters) | Inbox of all conversations (open + closed in the last 3 days), unread counts, "รอรับเรื่อง" marker. Can reply, **รับเรื่อง** (claim), **เปิด Ticket** (transcript → new Ticket, requester = chat user, assigned = self), **ปิด** (close). Replying to an unclaimed chat claims it automatically. |
 | **Everyone else** (Self-Service etc.) | One conversation with "IT Support". Typing starts one; after it's closed, **เริ่มใหม่** starts a new one. |
 
 **Inbox tabs, search, transfer (1.6.0+):**
 - Inbox tabs: ทั้งหมด / ของฉัน (chats I own) / รอรับ (unclaimed). The last tab used is remembered per browser.
 - The search box looks through *all* chats, any age: message text, requester name/login, or `#<ticket id>`.
 - **โอน** hands a chat to another technician, from the same technician list rule as `plugin_itchat_is_technician()`. A system message shows the handover, and the receiving tech gets a "ได้รับโอนแชท" alert.
+  If the chat already has a ticket that is not solved or closed, the ticket follows: the new tech is assigned in place of the previous chat tech (other assigned techs and groups stay), and the message says so ("(Ticket #n ด้วย)"). Solved / closed tickets are left alone.
 
 **Ticket ↔ chat sync (1.6.0+):** after **เปิด Ticket**, sync runs both ways:
 - Public followups added on the ticket are copied into the chat, prefixed 🎫. This uses the `item_add` hook on ITILFollowup. Private followups are never copied.

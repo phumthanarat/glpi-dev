@@ -1,4 +1,4 @@
-"""1.6.0 features: transfer between technicians, ticket <-> chat followup sync,
+"""1.6.0 features: transfer between technicians (with the chat's open ticket), ticket <-> chat followup sync,
 satisfaction rating (+ dashboard cards), chat history search, and linking the new
 ticket to a Problem from the เปิด Ticket dialog."""
 import json
@@ -33,6 +33,10 @@ techs = get(tech, action='techs').json()['techs']
 check('tech list offers the other test tech', any(t['id'] == me['tech2'] for t in techs), techs)
 check('tech list excludes myself', all(t['id'] != me['tech'] for t in techs))
 check('requester cannot list techs', get(u1, action='techs').status_code == 403)
+observer = login('itchat.test.observer')
+check('Observer (no ticket update right) is not a technician', get(observer, action='techs').status_code == 403)
+observer_id = poll(observer, open=0)[1]['me']
+check('Observer is not offered as a transfer target', all(t['id'] != observer_id for t in techs), techs)
 check('requester cannot transfer', post(u1, action='transfer', conv=conv, users_id=me['tech2'])[0] == 403)
 check('cannot transfer to a non-technician', post(tech, action='transfer', conv=conv, users_id=me['u2'])[0] == 400)
 c, r = post(tech, action='transfer', conv=conv, users_id=me['tech2'])
@@ -130,6 +134,25 @@ check('second incident linked to the existing Problem', c == 200 and r['problems
 check('Problem link visible on the ticket', inspect_tickets([r['tickets_id']])[r['tickets_id']]['problems'] == [pid])
 c, r = post(u1, action='send', conv=pconv2, content='x')  # keep the chat usable after linking
 check('chat still works after the link', c == 200, r)
+
+# ---------------------------------------------------------------- transfer moves the chat's ticket
+for s in (u1, u2):
+    close_open_chat(s)
+c, r = post(u2, action='send', conv=0, content=f'{PREFIX} transfer with ticket')
+tconv = r['conv']
+post(tech, action='claim', conv=tconv)
+tt = post(tech, action='toticket', conv=tconv, type=1)[1]['tickets_id']
+check('ticket starts with the chat tech assigned', inspect_tickets([tt])[tt]['assignees'] == ['itchat.test.tech'], inspect_tickets([tt])[tt])
+c, r = post(tech, action='transfer', conv=tconv, users_id=me['tech2'])
+check('transfer reports the ticket moved', c == 200 and r.get('ticket_moved') is True, r)
+check('ticket reassigned to the new tech in place of the old one',
+      inspect_tickets([tt])[tt]['assignees'] == ['itchat.test.tech2'], inspect_tickets([tt])[tt])
+c, p = poll(u2, conv=tconv)
+check('transfer message mentions the ticket', any(m['system'] and f'Ticket #{tt}' in m['content'] and 'โอนแชทให้' in m['content'] for m in p['messages']))
+fixture('ticket-status', tt, 5)  # solved
+c, r = post(tech2, action='transfer', conv=tconv, users_id=me['tech'])
+check('solved ticket stays with its assignee', c == 200 and r.get('ticket_moved') is False
+      and inspect_tickets([tt])[tt]['assignees'] == ['itchat.test.tech2'], (r, inspect_tickets([tt])[tt]))
 for s in (u1, u2):
     close_open_chat(s)
 

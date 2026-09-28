@@ -387,8 +387,10 @@
                 b.type = 'button';
                 b.addEventListener('click', () => {
                     closeTransferMenu();
-                    post({ action: 'transfer', conv: convId, users_id: t.id }).done(() => {
-                        if (typeof glpi_toast_info === 'function') glpi_toast_info('โอนแชทให้ ' + t.name + ' แล้ว');
+                    post({ action: 'transfer', conv: convId, users_id: t.id }).done((r) => {
+                        if (typeof glpi_toast_info === 'function') {
+                            glpi_toast_info('โอนแชทให้ ' + t.name + ' แล้ว' + (r && r.ticket_moved ? ' พร้อม Ticket' : ''));
+                        }
                         refresh();
                     }).fail(showError);
                 });

@@ -55,6 +55,8 @@ const USERS = [
     'itchat.test.user2' => 'Self-Service',
     'itchat.test.tech'  => 'Technician',
     'itchat.test.tech2' => 'Technician',
+    // look-only central profile: must chat as a requester, never be offered as a transfer target
+    'itchat.test.observer' => 'Observer',
     // Super-Admin for the suites that need one, instead of the real 'glpi' account (whose
     // password and 2FA belong to the people running GLPI)
     'itchat.test.admin' => 'Super-Admin',
@@ -501,6 +503,12 @@ switch ($argv[1] ?? '') {
             'is_private' => $private,
         ]);
         echo json_encode(['followup' => $id]), "\n";
+        break;
+
+    case 'ticket-status':
+        // php fixtures.php ticket-status <ticket id> <status> : set the status directly (no rules, no notifications)
+        $DB->update('glpi_tickets', ['status' => (int) $argv[3]], ['id' => (int) $argv[2]]);
+        echo json_encode(['status' => (int) $argv[3]]), "\n";
         break;
 
     case 'ticket-lifecycle':
