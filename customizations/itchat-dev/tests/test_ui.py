@@ -2,7 +2,7 @@
 
 Requester on a phone-sized screen and a technician on desktop, driving the real widget:
 send text + image, unread badge and inbox, claim, read receipts, live reply,
-"เปิด Ticket" dialog (type required, category disabled until type, approval hint),
+"เปิด Ticket" dialog (type required, category disabled until type, approval hint, Problem type with its Problem field),
 close from the phone and "เริ่มใหม่". Screenshots go to $SHOTS (default ./shots).
 """
 import os
@@ -154,7 +154,16 @@ with sync_playwright() as pw:
     t.wait_for_timeout(800)
     check('dialog: cannot submit without type', t.locator('.itchat-modal').count() == 1
           and t.locator('.itchat-system', has_text='เปิด Ticket #').count() == 0)
+    prob_sel = dlg.locator('select').nth(3)
+    check('dialog: Problem is offered as a type', 'Problem' in type_sel.inner_text())
+    type_sel.select_option('1')
+    check('dialog: Incident hides the Problem field', prob_sel.is_hidden())
+    type_sel.select_option('problem')
+    check('dialog: type Problem shows the Problem field, "new" preselected', prob_sel.is_visible()
+          and prob_sel.input_value() == '-1' and 'สร้าง Problem ใหม่' in prob_sel.inner_text())
+    t.screenshot(path=os.path.join(SHOTS, 'ui-2c-problem.png'))
     type_sel.select_option('2')
+    check('dialog: Request hides the Problem field', prob_sel.is_hidden())
     info = dlg.locator('.itchat-group-info').inner_text()
     check('dialog: Request shows approval by group manager', 'หัวหน้ากลุ่มอนุมัติ' in info and '[itchat-test] Group' in info, info)
     cat_sel.select_option(label='IT Support > Account > AD Account')

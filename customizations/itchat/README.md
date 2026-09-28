@@ -51,9 +51,11 @@ Files are served through `ajax/chat.php?action=file&msg=<id>`, gated by *convers
 (self-service users have none). Images show inline, except SVG, which is always a download (same rule as GLPI core).
 **เปิด Ticket** opens a dialog before creating the ticket (1.3.0+). It has these fields:
 - title, pre-filled with "แชท: " + the user's first message
-- type (Incident/Request), *required with no default* (1.4.0+), so a Request is never filed as an Incident by accident
+- type (Incident/Request/Problem), *required with no default* (1.4.0+), so a Request is never filed as an Incident by accident.
+  Problem is not a GLPI ticket type: it files an **Incident** ticket and links it to a Problem (below). Offered only to techs who may create or link Problems
 - category, filtered to categories flagged for that type and visible in the tech's entities
 - urgency, limited to the values enabled in `urgency_mask`
+- Problem (type Problem only, required): **สร้าง Problem ใหม่จาก Ticket นี้** (default) / link to an open Problem (not solved or closed, in the tech's entities). A new Problem is made the way GLPI's own "Create a problem from this ticket" does it (`_tickets_id`), with the tech as assignee. Needs the `problem` UPDATE right to list/link and CREATE to make one. The API still accepts `type=1` with `problem=<id|-1>`. The requester is not told about the Problem.
 
 The ticket also gets a **requester group**, so the "Request needs manager approval" rule (setup-08) can find an approver. That is the user's default group, else their only group, and only if it is flagged `is_requester`.
 The dialog tells the technician up front whether a Request will actually go to approval: no group, a group without a manager, or a group whose manager will be asked.

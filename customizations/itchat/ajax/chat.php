@@ -9,7 +9,9 @@
  * POST action=claim      conv=<id>                    (tech)
  * POST action=close      conv=<id>
  * GET  action=ticketform conv=<id>                    (tech: suggested title + categories for the dialog)
- * POST action=toticket   conv=<id> [name, type, itilcategories_id, urgency]  (tech)
+ * POST action=toticket   conv=<id> [name, type, itilcategories_id, urgency, problem]  (tech;
+ *                        type: 1 = Incident, 2 = Request, 'problem' = Incident linked to a Problem;
+ *                        problem: 0 = none, -1 = new Problem from this ticket, <id> = link to that open Problem)
  * GET  action=techs                                   (tech: who a chat can be transferred to)
  * POST action=transfer   conv=<id> users_id=<tech>    (tech)
  * POST action=rate       conv=<id> value=1..5         (requester, closed chat, once)
@@ -197,6 +199,32 @@ $urgencies = static function () use ($CFG_GLPI): array {
     return $out;
 };
 
+/**
+ * What the dialog may offer for linking the new ticket to a Problem (ITIL: incidents with the same
+ * root cause go under one Problem). 'open' lists not-yet-solved Problems in the tech's entities,
+ * newest first; null when the tech has no right to update Problems.
+ * @return array{create:bool, open:list<array{id:int, name:string}>|null}
+ */
+$problem_options = static function () use ($DB): array {
+    $open = null;
+    if (Session::haveRight(Problem::$rightname, UPDATE)) {
+        $open = [];
+        foreach (
+            $DB->request([
+                'SELECT' => ['id', 'name'],
+                'FROM'   => Problem::getTable(),
+                'WHERE'  => ['is_deleted' => 0, 'status' => Problem::getNotSolvedStatusArray()]
+                    + getEntitiesRestrictCriteria(Problem::getTable()),
+                'ORDER'  => 'id DESC',
+                'LIMIT'  => 200,
+            ]) as $p
+        ) {
+            $open[] = ['id' => (int) $p['id'], 'name' => $p['name']];
+        }
+    }
+    return ['create' => Problem::canCreate(), 'open' => $open];
+};
+
 switch ($action) {
     case 'ticketform':
         if (!$is_tech) {
@@ -207,15 +235,20 @@ switch ($action) {
             return $fail('conversation not found', 404);
         }
         Session::writeClose();
+        $popts = $problem_options();
         return new JsonResponse([
             'title'      => $suggest_title($conv),
             'requester_group' => $requester_group((int) $conv['users_id']),
             'categories' => array_values($ticket_categories()),
             'urgencies'  => $urgencies(),
-            'types'      => [
+            'problems'   => $popts,
+            'types'      => array_merge([
                 ['value' => Ticket::INCIDENT_TYPE, 'label' => 'Incident (แจ้งปัญหา)'],
                 ['value' => Ticket::DEMAND_TYPE,   'label' => 'Request (ขอใช้บริการ)'],
-            ],
+            ], $popts['create'] || !empty($popts['open'])
+                // Not a ticket type in GLPI: an Incident ticket that goes under a Problem.
+                ? [['value' => 'problem', 'label' => 'Problem (ปัญหาที่เกิดซ้ำ / ต้องหาสาเหตุ)']]
+                : []),
         ]);
 
     case 'poll':
@@ -641,10 +674,12 @@ switch ($action) {
             return $fail('ticket already created');
         }
         // Fields from the dialog.
-        // Type is required: the technician must pick Incident or Request explicitly.
-        $type = (int) ($_POST['type'] ?? 0);
+        // Type is required: the technician must pick Incident, Request or Problem explicitly.
+        // 'problem' = an Incident ticket that must be linked to a (new or open) Problem.
+        $as_problem = ($_POST['type'] ?? '') === 'problem';
+        $type = $as_problem ? Ticket::INCIDENT_TYPE : (int) ($_POST['type'] ?? 0);
         if (!in_array($type, [Ticket::INCIDENT_TYPE, Ticket::DEMAND_TYPE], true)) {
-            return $fail('กรุณาเลือกประเภท Ticket (Incident หรือ Request)');
+            return $fail('กรุณาเลือกประเภท Ticket (Incident, Request หรือ Problem)');
         }
         $category_id = (int) ($_POST['itilcategories_id'] ?? 0);
         if ($category_id > 0) {
@@ -656,6 +691,20 @@ switch ($action) {
         $urgency = (int) ($_POST['urgency'] ?? 3);
         if (!in_array($urgency, array_column($urgencies(), 'value'), true)) {
             return $fail('ความเร่งด่วนไม่ถูกต้อง');
+        }
+        // Optional Problem link, incidents only: -1 = new Problem from this ticket, <id> = existing one.
+        $problem = (int) ($_POST['problem'] ?? ($as_problem ? -1 : 0));
+        if ($as_problem && $problem === 0) {
+            return $fail('กรุณาเลือก Problem');
+        }
+        if ($problem !== 0) {
+            $popts = $problem_options();
+            if ($type !== Ticket::INCIDENT_TYPE) {
+                return $fail('เชื่อมโยง Problem ได้เฉพาะ Incident');
+            }
+            if ($problem === -1 ? !$popts['create'] : !in_array($problem, array_column($popts['open'] ?? [], 'id'), true)) {
+                return $fail('ไม่มีสิทธิ์หรือไม่พบ Problem ที่เลือก');
+            }
         }
         $custom_title = trim(preg_replace('/\s+/u', ' ', (string) ($_POST['name'] ?? '')));
         $lines = [];
@@ -720,6 +769,23 @@ switch ($action) {
                 'items_id'     => $tickets_id,
             ]);
         }
+        // Problem link. The ticket already exists, so a failure here is reported, not fatal.
+        $problems_id = 0;
+        if ($problem === -1) {
+            // Same as GLPI's "Create a problem from this ticket": _tickets_id makes Problem::post_addItem
+            // add the Problem_Ticket link and copy the ticket's items.
+            $problems_id = (int) (new Problem())->add([
+                'name'              => $title,
+                'content'           => $ticket->fields['content'],
+                'entities_id'       => $ticket->fields['entities_id'],
+                'itilcategories_id' => $category_id,
+                'urgency'           => $urgency,
+                '_users_id_assign'  => $me,
+                '_tickets_id'       => $tickets_id,
+            ]);
+        } elseif ($problem > 0) {
+            $problems_id = (new Problem_Ticket())->add(['problems_id' => $problem, 'tickets_id' => $tickets_id]) ? $problem : 0;
+        }
         $DB->update(
             ITCHAT_CONV,
             ['tickets_id' => $tickets_id, 'users_id_tech' => $conv['users_id_tech'] ?: $me],
@@ -727,9 +793,11 @@ switch ($action) {
         );
         $add_msg((int) $conv['id'], 0, sprintf('เปิด Ticket #%d จากการสนทนานี้แล้ว', $tickets_id));
         return new JsonResponse([
-            'ok'         => true,
-            'tickets_id' => $tickets_id,
-            'ticket_url' => Ticket::getFormURLWithID($tickets_id),
+            'ok'          => true,
+            'tickets_id'  => $tickets_id,
+            'ticket_url'  => Ticket::getFormURLWithID($tickets_id),
+            'problems_id' => $problems_id,
+            'problem_failed' => $problem !== 0 && $problems_id === 0,
         ]);
 }
 

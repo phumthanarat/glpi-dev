@@ -113,6 +113,19 @@ function teardown(): array
         'FROM'   => 'glpi_tickets',
         'WHERE'  => ['OR' => [['name' => ['LIKE', 'แชท: [itchat-test]%']], ['name' => ['LIKE', '[itchat-test]%']]]],
     ])), 'id'))));
+    // Problems made from test chats (title "แชท: [itchat-test]...") or by the tests ("[itchat-test]...").
+    $done['problems'] = 0;
+    foreach (
+        $DB->request([
+            'SELECT' => 'id',
+            'FROM'   => 'glpi_problems',
+            'WHERE'  => ['OR' => [['name' => ['LIKE', 'แชท: [itchat-test]%']], ['name' => ['LIKE', '[itchat-test]%']]]],
+        ]) as $r
+    ) {
+        if ((new Problem())->delete(['id' => $r['id']], true)) {
+            $done['problems']++;
+        }
+    }
     if ($ticket_ids !== []) {
         $doc_ids = array_merge($doc_ids, array_map('intval', array_column(iterator_to_array($DB->request([
             'SELECT' => 'documents_id',
@@ -261,6 +274,7 @@ switch ($argv[1] ?? '') {
                 'requesttype_name'  => (new RequestType())->getFromDB($t->fields['requesttypes_id']) ? RequestType::getFriendlyNameById($t->fields['requesttypes_id']) : null,
                 'items'             => array_values(array_map(static fn($r) => $r['itemtype'] . ':' . $r['items_id'],
                     iterator_to_array($DB->request(['FROM' => 'glpi_items_tickets', 'WHERE' => ['tickets_id' => $tid]])))),
+                'type'              => (int) $t->fields['type'],
                 'entity'            => (int) $t->fields['entities_id'],
                 'content'           => Glpi\RichText\RichText::getTextFromHtml((string) $t->fields['content'], false, false, false, true),
                 'global_validation' => (int) $t->fields['global_validation'],
@@ -270,6 +284,9 @@ switch ($argv[1] ?? '') {
                 'assign_groups'     => $groups(CommonITILActor::ASSIGN),
                 'approvers'         => $approvers,
                 'documents'         => countElementsInTable('glpi_documents_items', ['itemtype' => 'Ticket', 'items_id' => $tid]),
+                'problems'          => array_values(array_map('intval', array_column(iterator_to_array(
+                    $DB->request(['SELECT' => 'problems_id', 'FROM' => 'glpi_problems_tickets', 'WHERE' => ['tickets_id' => $tid]])
+                ), 'problems_id'))),
                 'sla_ttr'           => (int) $t->fields['slas_id_ttr'],
                 'tasks'             => array_values(array_map(static fn($r) => Glpi\RichText\RichText::getTextFromHtml((string) $r['content'], false, false, false, true),
                     iterator_to_array($DB->request(['FROM' => 'glpi_tickettasks', 'WHERE' => ['tickets_id' => $tid], 'ORDER' => 'id'])))),

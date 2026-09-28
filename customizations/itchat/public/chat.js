@@ -497,7 +497,9 @@
                 name.value = f.title;
                 name.required = true;
 
-                // No default type: the technician has to choose Incident or Request.
+                // No default type: the technician has to choose Incident, Request or Problem.
+                // Problem = an Incident ticket linked to a Problem, so it uses Incident categories.
+                const isIncidentLike = () => type.value === String(f.types[0].value) || type.value === 'problem';
                 const type = el('select', 'form-select form-select-sm');
                 type.required = true;
                 const placeholder = option('', '— เลือกประเภท —', true);
@@ -517,7 +519,7 @@
                         return;
                     }
                     cat.disabled = false;
-                    const isIncident = type.value === String(f.types[0].value);
+                    const isIncident = isIncidentLike();
                     cat.replaceChildren(option(0, '— ไม่ระบุ —', true));
                     f.categories
                         .filter((c) => (isIncident ? c.incident : c.request))
@@ -545,12 +547,26 @@
                 const urg = el('select', 'form-select form-select-sm');
                 f.urgencies.forEach((u) => urg.appendChild(option(u.value, u.label, u.value === 3)));
 
+                // Problem (type "Problem" only): new Problem from this ticket, or an open one.
+                const pr = f.problems || {};
+                const prob = el('select', 'form-select form-select-sm');
+                if (pr.create) prob.appendChild(option(-1, '➕ สร้าง Problem ใหม่จาก Ticket นี้', true));
+                (pr.open || []).forEach((p) => prob.appendChild(option(p.id, '#' + p.id + ' ' + p.name, false)));
+                const probField = field('Problem', prob,
+                    'ปัญหาที่เกิดซ้ำ: สร้าง Incident จากแชทนี้แล้วเชื่อมไว้ใต้ Problem (Incident ที่มีสาเหตุเดียวกันเชื่อมไว้ที่ Problem เดียว)');
+                const showProblem = () => {
+                    probField.hidden = type.value !== 'problem';
+                };
+                showProblem();
+                type.addEventListener('change', showProblem);
+
                 card.append(
                     field('ชื่อเรื่อง', name),
                     field('ประเภท', type),
                     groupInfo,
                     field('หมวดหมู่', cat, 'ทีมผู้ดูแลและ SLA กำหนดตาม Business rules ที่เปิดใช้อยู่ (Setup > Rules)'),
-                    field('ความเร่งด่วน', urg)
+                    field('ความเร่งด่วน', urg),
+                    probField
                 );
 
                 const btns = el('div', 'itchat-modal-actions');
@@ -575,10 +591,15 @@
                         type: type.value,
                         itilcategories_id: cat.value,
                         urgency: urg.value,
+                        problem: type.value === 'problem' ? prob.value : 0,
                     }).done((r) => {
                         closeTicketDialog();
                         if (typeof glpi_toast_info === 'function') {
-                            glpi_toast_info('สร้าง Ticket #' + r.tickets_id + ' แล้ว');
+                            glpi_toast_info('สร้าง Ticket #' + r.tickets_id + ' แล้ว'
+                                + (r.problems_id ? ' · เชื่อมกับ Problem #' + r.problems_id : ''));
+                        }
+                        if (r.problem_failed && typeof glpi_toast_warning === 'function') {
+                            glpi_toast_warning('สร้าง Ticket แล้ว แต่เชื่อมโยง Problem ไม่สำเร็จ ทำต่อได้ที่แท็บ Problems ของ Ticket');
                         }
                         refresh();
                     }).fail((xhr) => {

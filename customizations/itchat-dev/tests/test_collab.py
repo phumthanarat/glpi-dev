@@ -1,5 +1,6 @@
 """1.6.0 features: transfer between technicians, ticket <-> chat followup sync,
-satisfaction rating (+ dashboard cards) and chat history search."""
+satisfaction rating (+ dashboard cards), chat history search, and linking the new
+ticket to a Problem from the เปิด Ticket dialog."""
 import json
 import os
 import subprocess
@@ -99,5 +100,37 @@ check('search by ticket number', [x['id'] for x in res] == [conv], res)
 check('search with 1 char returns nothing', get(tech, action='search', q='a').json()['results'] == [])
 check('LIKE wildcards are escaped', get(tech, action='search', q='%%').json()['results'] == [])
 check('requester cannot search', get(u1, action='search', q=token).status_code == 403)
+
+# ---------------------------------------------------------------- problem link
+for s in (u1, u2):
+    close_open_chat(s)
+c, r = post(u2, action='send', conv=0, content=f'{PREFIX} problem link: printer jams again')
+pconv = r['conv']
+form = get(tech, action='ticketform', conv=pconv).json()
+check('dialog offers "new Problem" to a technician', form['problems']['create'] is True, form['problems'])
+check('dialog lists open Problems', isinstance(form['problems']['open'], list), form['problems'])
+check('dialog offers Problem as a type', 'problem' in [t['value'] for t in form['types']], form['types'])
+check('type Problem without a Problem refused', post(tech, action='toticket', conv=pconv, type='problem', problem=0)[0] == 400)
+check('Problem link refused for a Request', post(tech, action='toticket', conv=pconv, type=2, problem=-1)[0] == 400)
+check('unknown Problem id refused', post(tech, action='toticket', conv=pconv, type=1, problem=99999999)[0] == 400)
+c, r = post(tech, action='toticket', conv=pconv, type='problem')  # defaults to a new Problem
+pid = r.get('problems_id') if isinstance(r, dict) else None
+check('new Problem created from the ticket', c == 200 and pid and not r['problem_failed'], r)
+ptid = r.get('tickets_id')
+check('ticket linked to the new Problem', inspect_tickets([ptid])[ptid]['problems'] == [pid])
+check('type Problem files an Incident ticket', inspect_tickets([ptid])[ptid]['type'] == 1, inspect_tickets([ptid])[ptid])
+c, p = poll(u2, conv=pconv)
+check('requester is not told about the Problem', not any('Problem' in m['content'] for m in p['messages']))
+c, r = post(u1, action='send', conv=0, content=f'{PREFIX} problem link: same printer again')
+pconv2 = r['conv']
+form = get(tech, action='ticketform', conv=pconv2).json()
+check('the new Problem is offered for the next incident', pid in [x['id'] for x in form['problems']['open'] or []])
+c, r = post(tech, action='toticket', conv=pconv2, type='problem', problem=pid)
+check('second incident linked to the existing Problem', c == 200 and r['problems_id'] == pid, r)
+check('Problem link visible on the ticket', inspect_tickets([r['tickets_id']])[r['tickets_id']]['problems'] == [pid])
+c, r = post(u1, action='send', conv=pconv2, content='x')  # keep the chat usable after linking
+check('chat still works after the link', c == 200, r)
+for s in (u1, u2):
+    close_open_chat(s)
 
 check.done()
