@@ -100,7 +100,7 @@
         "tecnickcom/tcpdf": "^6.11",
         "thecodingmachine/safe": "^3.3",
         "thenetworg/oauth2-azure": "^2.2",
-        "twig/markdown-extra": "^3.21",
+        "twig/markdown-extra": "^3.26",
         "twig/string-extra": "^3.21",
         "twig/twig": "^3.22",
         "wapmorgan/unified-archive": "^1.3",
