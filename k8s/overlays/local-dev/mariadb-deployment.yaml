@@ -50,10 +50,17 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 10
+          # the first start initialises the data dir, slow on a laptop disk: no liveness
+          # kills until the server has answered once
+          startupProbe:
+            exec:
+              command: ["healthcheck.sh", "--connect"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             exec:
               command: ["healthcheck.sh", "--connect"]
-            initialDelaySeconds: 30
             periodSeconds: 20
             timeoutSeconds: 5
       volumes:

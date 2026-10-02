@@ -179,7 +179,8 @@ else
 fi
 
 # ------------------------------------------------------------------ 5. plugin update
-if [ "$VERSION_CHANGED" = 1 ]; then
+# an interrupted first install leaves the version recorded but the plugin 'Not installed'
+if [ "$VERSION_CHANGED" = 1 ] || [ "$DB_STATUS" = "Not installed" ]; then
     step "5. plugin update ${DB_VERSION:-none} -> $LOCAL_VERSION (widget is unloaded until this finishes)"
     kexec php bin/console plugin:install itchat -u glpi --force --no-interaction
     kexec php bin/console plugin:activate itchat --no-interaction

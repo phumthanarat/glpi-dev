@@ -76,14 +76,22 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          # liveness only starts once the app has answered: a cold PHP start on 0.5 CPU
+          # can take well over a second, and a kill also kills any running console command
+          startupProbe:
+            httpGet: { path: /, port: 8080 }
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet: { path: /, port: 8080 }
-            initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet: { path: /, port: 8080 }
-            initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - { name: glpi-data, mountPath: /var/www/glpi/config, subPath: config }
             - { name: glpi-data, mountPath: /var/www/glpi/files, subPath: files }

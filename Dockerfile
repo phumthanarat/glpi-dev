@@ -70,6 +70,8 @@ RUN apk add --no-cache php83 && ln -s /usr/bin/php83 /usr/bin/php
 
 COPY .npmrc package.json package-lock.json ./
 COPY tools/ tools/
+# Cypress is only for the e2e tests: skip its ~250 MB binary download.
+ENV CYPRESS_INSTALL_BINARY=0
 RUN npm ci
 
 COPY .webpack.config.js .vue.webpack.config.js ./
